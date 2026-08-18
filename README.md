@@ -1,16 +1,49 @@
-# React + Vite
+# WanderVista ✈️
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Full-stack travel booking application built with React (Vite) and Node.js (Express + MongoDB).
 
-Currently, two official plugins are available:
+## Project Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```
+project 1/
+├── backend/            # Express API, MongoDB models, Auth & Booking routes
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── routes/
+│   ├── seed.js
+│   └── server.js
+├── frontend/           # React + Vite frontend application
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── context/
+│   │   ├── pages/
+│   │   └── services/
+│   └── vite.config.js
+└── README.md
+```
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 1. Start Backend Server
+```bash
+cd backend
+npm install
+npm run dev
+```
+> Server runs on `http://localhost:5001` (connected to MongoDB)
 
-## Expanding the Oxlint configuration
+To seed initial destination data:
+```bash
+cd backend
+node seed.js
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+### 2. Start Frontend App
+```bash
+cd frontend
+npm install
+npm run dev
+```
+> Frontend runs on `http://localhost:5173`
