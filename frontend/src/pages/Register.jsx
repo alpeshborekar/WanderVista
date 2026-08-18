@@ -1,43 +1,46 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, User, Phone, Globe, ArrowLeft, CheckCircle, AlertCircle, Compass } from 'lucide-react';
+import { User, Mail, Lock, Phone, Globe, Eye, EyeOff, ArrowLeft, Compass, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import styles from './Register.module.css';
 
-const COUNTRIES = [
-  'India', 'United States', 'United Kingdom', 'Canada', 'Australia',
-  'Germany', 'France', 'Japan', 'Brazil', 'South Africa', 'UAE', 'Singapore'
-];
-
-const Register = () => {
+export default function Register() {
   const [formData, setFormData] = useState({
-    fullName: '', email: '', phoneCode: '+91', phone: '',
-    country: '', password: '', confirmPassword: '', terms: false
+    fullName: '',
+    email: '',
+    phone: '',
+    country: 'India',
+    password: '',
+    confirmPassword: ''
   });
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const validate = () => {
-    const newErrors = {};
-    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!formData.email) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Please enter a valid email';
-    if (!formData.phone) newErrors.phone = 'Phone number is required';
-    else if (!/^\d{10,}$/.test(formData.phone.replace(/\D/g, ''))) newErrors.phone = 'Please enter a valid phone number (min 10 digits)';
-    if (!formData.country) newErrors.country = 'Please select a country';
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 8 || !/(?=.*[A-Z])(?=.*\d)/.test(formData.password)) newErrors.password = 'Password must be 8+ chars with uppercase & number';
-    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
-    if (!formData.terms) newErrors.terms = 'You must agree to the Terms & Conditions';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const errs = {};
+    if (!formData.fullName.trim()) errs.fullName = 'Full name is required';
+    if (!formData.email.trim()) {
+      errs.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errs.email = 'Please enter a valid email address';
+    }
+    if (!formData.phone.trim()) {
+      errs.phone = 'Phone number is required';
+    }
+    if (!formData.password) {
+      errs.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      errs.password = 'Password must be at least 8 characters';
+    }
+    if (formData.password !== formData.confirmPassword) {
+      errs.confirmPassword = 'Passwords do not match';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
   const handleSubmit = async (e) => {
@@ -49,12 +52,11 @@ const Register = () => {
       await register({
         fullName: formData.fullName,
         email: formData.email,
-        phone: `${formData.phoneCode}${formData.phone}`,
+        phone: formData.phone,
         country: formData.country,
-        password: formData.password,
+        password: formData.password
       });
-      setShowToast(true);
-      setTimeout(() => navigate('/dashboard'), 1500);
+      navigate('/');
     } catch (err) {
       setApiError(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -63,158 +65,152 @@ const Register = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
     if (apiError) setApiError('');
   };
 
   return (
     <div className={styles.container}>
-      {/* Left Panel */}
-      <div className={styles.leftPanel}>
-        <div className={styles.overlay}>
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8 }} className={styles.overlayContent}>
-            <div className={styles.logoWrapper}><Compass className={styles.logoIcon} size={56} /></div>
-            <h1 className={styles.logoText}>WanderVista</h1>
-            <p className={styles.tagline}>Discover the world's wonders with us.</p>
-          </motion.div>
+      <div className={styles.authCard}>
+        
+        {/* Back Link */}
+        <Link to="/" className={styles.backLink}>
+          <ArrowLeft size={16} /> Back to All Packages
+        </Link>
+
+        {/* Brand Header */}
+        <div className={styles.brandHeader}>
+          <Compass size={32} className={styles.brandIcon} />
+          <h1 className={styles.brandTitle}>Create an Account</h1>
+          <p className={styles.brandSubtitle}>Join WanderVista to book and manage world-class tours</p>
         </div>
-      </div>
 
-      {/* Right Panel */}
-      <div className={styles.rightPanel}>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className={styles.formContainer}>
-
-          {/* BACK BUTTON */}
-          <Link to="/" className={styles.backLink}>
-            <ArrowLeft size={18} />
-            Back to Home
-          </Link>
-
-          <div className={styles.mobileLogo}>
-            <Compass className={styles.logoIconMobile} size={32} />
-            <span>WanderVista</span>
+        {apiError && (
+          <div className={styles.errorAlert}>
+            <AlertCircle size={16} />
+            <span>{apiError}</span>
           </div>
-
-          <div className={styles.headerText}>
-            <h2>Create Account</h2>
-            <p>Join thousands of travelers</p>
-          </div>
-
-          {apiError && (
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className={styles.apiError}>
-              <AlertCircle size={18} />
-              <span>{apiError}</span>
-            </motion.div>
-          )}
-
-          <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.inputGroup}>
-              <div className={styles.inputWrapper}>
-                <User className={styles.inputIcon} size={20} />
-                <input type="text" name="fullName" placeholder="Full Name" value={formData.fullName} onChange={handleChange}
-                  className={`${styles.input} ${errors.fullName ? styles.inputError : ''}`} />
-              </div>
-              <AnimatePresence>{errors.fullName && <motion.span initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} className={styles.errorText}>{errors.fullName}</motion.span>}</AnimatePresence>
-            </div>
-
-            <div className={styles.inputGroup}>
-              <div className={styles.inputWrapper}>
-                <Mail className={styles.inputIcon} size={20} />
-                <input type="email" name="email" placeholder="Email Address" value={formData.email} onChange={handleChange}
-                  className={`${styles.input} ${errors.email ? styles.inputError : ''}`} />
-              </div>
-              <AnimatePresence>{errors.email && <motion.span initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} className={styles.errorText}>{errors.email}</motion.span>}</AnimatePresence>
-            </div>
-
-            <div className={styles.row}>
-              <div className={styles.inputGroup}>
-                <div className={`${styles.inputWrapper} ${styles.phoneWrapper}`}>
-                  <Phone className={styles.inputIcon} size={20} />
-                  <select name="phoneCode" value={formData.phoneCode} onChange={handleChange} className={styles.codeSelect}>
-                    <option value="+91">+91</option>
-                    <option value="+1">+1</option>
-                    <option value="+44">+44</option>
-                    <option value="+61">+61</option>
-                    <option value="+971">+971</option>
-                  </select>
-                  <input type="tel" name="phone" placeholder="Phone Number" value={formData.phone} onChange={handleChange}
-                    className={`${styles.input} ${styles.phoneInput} ${errors.phone ? styles.inputError : ''}`} />
-                </div>
-                <AnimatePresence>{errors.phone && <motion.span initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} className={styles.errorText}>{errors.phone}</motion.span>}</AnimatePresence>
-              </div>
-
-              <div className={styles.inputGroup}>
-                <div className={styles.inputWrapper}>
-                  <Globe className={styles.inputIcon} size={20} />
-                  <select name="country" value={formData.country} onChange={handleChange}
-                    className={`${styles.input} ${styles.select} ${errors.country ? styles.inputError : ''}`}>
-                    <option value="" disabled>Select Country</option>
-                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <AnimatePresence>{errors.country && <motion.span initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} className={styles.errorText}>{errors.country}</motion.span>}</AnimatePresence>
-              </div>
-            </div>
-
-            <div className={styles.row}>
-              <div className={styles.inputGroup}>
-                <div className={styles.inputWrapper}>
-                  <Lock className={styles.inputIcon} size={20} />
-                  <input type={showPassword ? 'text' : 'password'} name="password" placeholder="Password" value={formData.password} onChange={handleChange}
-                    className={`${styles.input} ${errors.password ? styles.inputError : ''}`} />
-                  <button type="button" className={styles.togglePassword} onClick={() => setShowPassword(!showPassword)}>
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
-                <AnimatePresence>{errors.password && <motion.span initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} className={styles.errorText}>{errors.password}</motion.span>}</AnimatePresence>
-              </div>
-
-              <div className={styles.inputGroup}>
-                <div className={styles.inputWrapper}>
-                  <Lock className={styles.inputIcon} size={20} />
-                  <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword" placeholder="Confirm Password" value={formData.confirmPassword} onChange={handleChange}
-                    className={`${styles.input} ${errors.confirmPassword ? styles.inputError : ''}`} />
-                  <button type="button" className={styles.togglePassword} onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
-                <AnimatePresence>{errors.confirmPassword && <motion.span initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} className={styles.errorText}>{errors.confirmPassword}</motion.span>}</AnimatePresence>
-              </div>
-            </div>
-
-            <div className={styles.termsGroup}>
-              <label className={styles.checkboxLabel}>
-                <input type="checkbox" name="terms" checked={formData.terms} onChange={handleChange} />
-                <span className={styles.checkmark}></span>
-                I agree to the Terms & Conditions and Privacy Policy
-              </label>
-              <AnimatePresence>{errors.terms && <motion.span initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} className={styles.errorText}>{errors.terms}</motion.span>}</AnimatePresence>
-            </div>
-
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit"
-              className={styles.submitBtn} disabled={isLoading}>
-              {isLoading ? 'Creating Account...' : 'Create Account'}
-            </motion.button>
-          </form>
-
-          <p className={styles.bottomText}>
-            Already have an account? <Link to="/login">Login</Link>
-          </p>
-        </motion.div>
-      </div>
-
-      <AnimatePresence>
-        {showToast && (
-          <motion.div initial={{ opacity: 0, y: 50, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, y: 50, x: '-50%' }} className={styles.toast}>
-            <CheckCircle size={24} />
-            <span>Account created successfully!</span>
-          </motion.div>
         )}
-      </AnimatePresence>
+
+        <form onSubmit={handleSubmit} className={styles.form}>
+          
+          <div className={styles.field}>
+            <label className={styles.label}>Full Name *</label>
+            <div className={styles.inputWrapper}>
+              <User size={18} className={styles.fieldIcon} />
+              <input
+                type="text"
+                name="fullName"
+                placeholder="e.g. Priya Patel"
+                value={formData.fullName}
+                onChange={handleChange}
+                className={`${styles.input} ${errors.fullName ? styles.inputError : ''}`}
+              />
+            </div>
+            {errors.fullName && <span className={styles.errorText}>{errors.fullName}</span>}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Email Address *</label>
+            <div className={styles.inputWrapper}>
+              <Mail size={18} className={styles.fieldIcon} />
+              <input
+                type="email"
+                name="email"
+                placeholder="priya@example.com"
+                value={formData.email}
+                onChange={handleChange}
+                className={`${styles.input} ${errors.email ? styles.inputError : ''}`}
+              />
+            </div>
+            {errors.email && <span className={styles.errorText}>{errors.email}</span>}
+          </div>
+
+          <div className={styles.formRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>Phone Number *</label>
+              <div className={styles.inputWrapper}>
+                <Phone size={18} className={styles.fieldIcon} />
+                <input
+                  type="tel"
+                  name="phone"
+                  placeholder="+91 98765 43210"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className={`${styles.input} ${errors.phone ? styles.inputError : ''}`}
+                />
+              </div>
+              {errors.phone && <span className={styles.errorText}>{errors.phone}</span>}
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Country</label>
+              <div className={styles.inputWrapper}>
+                <Globe size={18} className={styles.fieldIcon} />
+                <select
+                  name="country"
+                  value={formData.country}
+                  onChange={handleChange}
+                  className={styles.select}
+                >
+                  <option value="India">India</option>
+                  <option value="United States">United States</option>
+                  <option value="United Kingdom">United Kingdom</option>
+                  <option value="United Arab Emirates">United Arab Emirates</option>
+                  <option value="Singapore">Singapore</option>
+                  <option value="Australia">Australia</option>
+                  <option value="Canada">Canada</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.formRow}>
+            <div className={styles.field}>
+              <label className={styles.label}>Password *</label>
+              <div className={styles.inputWrapper}>
+                <Lock size={18} className={styles.fieldIcon} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Min 8 characters"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={`${styles.input} ${errors.password ? styles.inputError : ''}`}
+                />
+              </div>
+              {errors.password && <span className={styles.errorText}>{errors.password}</span>}
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Confirm Password *</label>
+              <div className={styles.inputWrapper}>
+                <Lock size={18} className={styles.fieldIcon} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="confirmPassword"
+                  placeholder="Repeat password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className={`${styles.input} ${errors.confirmPassword ? styles.inputError : ''}`}
+                />
+              </div>
+              {errors.confirmPassword && <span className={styles.errorText}>{errors.confirmPassword}</span>}
+            </div>
+          </div>
+
+          <button type="submit" className={styles.submitBtn} disabled={isLoading}>
+            {isLoading ? 'Creating Account...' : 'Create Account'}
+          </button>
+        </form>
+
+        <div className={styles.footerNote}>
+          Already have an account? <Link to="/login">Sign In</Link>
+        </div>
+
+      </div>
     </div>
   );
-};
-
-export default Register;
+}

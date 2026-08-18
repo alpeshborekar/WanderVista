@@ -1,224 +1,441 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, CheckCircle, Calendar, Users, MapPin, Package, CreditCard, Compass } from 'lucide-react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { bookingsAPI } from '../services/api';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import {
+  Calendar, Users, User, Mail, Phone, ShieldCheck,
+  CheckCircle, ArrowLeft, ArrowRight, CreditCard, Lock, AlertCircle
+} from 'lucide-react';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
+import { useAuth } from '../context/AuthContext';
+import { packagesAPI, bookingsAPI } from '../services/api';
+import { PACKAGES } from '../data/packagesData';
 import styles from './Booking.module.css';
 
-const PACKAGES = [
-  { id: 'starter', name: 'Starter Explorer', multiplier: 1, badge: 'Basic', color: '#64748b',
-    features: ['5 Days / 4 Nights', 'Breakfast Included', '3-Star Hotel', 'Shared Bus', 'Audio Guide'] },
-  { id: 'pro', name: 'Adventure Pro', multiplier: 1.5, badge: 'Popular', color: '#3b82f6',
-    features: ['10 Days / 9 Nights', 'All Meals Included', '4-Star Hotel', 'Private Car', 'Personal Guide'] },
-  { id: 'luxury', name: 'Luxury Escape', multiplier: 2.5, badge: 'Premium', color: '#f59e0b',
-    features: ['15 Days / 14 Nights', 'Gourmet Dining', '5-Star Resort', 'Private Jet Transfer', 'VIP Concierge'] },
-];
-
 export default function Booking() {
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState({
-    destinationId: '', destinationName: '', basePrice: 0,
-    startDate: '', endDate: '', travelers: 2,
-    packageType: 'pro', specialRequests: ''
-  });
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(null);
-  const [error, setError] = useState('');
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
+  const initialPackageId = searchParams.get('packageId') || PACKAGES[0].id;
+  const initialDate = searchParams.get('date') || '';
+  const initialTravelers = Math.max(1, Number(searchParams.get('travelers')) || 2);
+
+  const [selectedPackageId, setSelectedPackageId] = useState(initialPackageId);
+  const [pkg, setPkg] = useState(null);
+  const [departureDate, setDepartureDate] = useState(initialDate);
+  const [travelersCount, setTravelersCount] = useState(initialTravelers);
+
+  const [leadTraveler, setLeadTraveler] = useState({
+    fullName: user?.fullName || '',
+    email: user?.email || '',
+    phone: user?.phone || ''
+  });
+
+  const [additionalTravelers, setAdditionalTravelers] = useState(
+    Array.from({ length: initialTravelers - 1 }, () => ({ fullName: '' }))
+  );
+
+  const [specialRequests, setSpecialRequests] = useState('');
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState('');
+
+  // Load selected package details
   useEffect(() => {
-    const dest = searchParams.get('dest');
-    const name = searchParams.get('name');
-    const price = searchParams.get('price');
-    if (dest && name) {
-      setForm(prev => ({ ...prev, destinationId: dest, destinationName: decodeURIComponent(name), basePrice: Number(price) || 0 }));
-    }
-  }, [searchParams]);
+    loadPackage(selectedPackageId);
+  }, [selectedPackageId]);
 
-  const selectedPkg = PACKAGES.find(p => p.id === form.packageType);
-  const totalPrice = form.basePrice * form.travelers * (selectedPkg?.multiplier || 1);
+  // Adjust additional travelers array when count changes
+  useEffect(() => {
+    const extraNeeded = Math.max(0, travelersCount - 1);
+    setAdditionalTravelers(prev => {
+      if (prev.length === extraNeeded) return prev;
+      if (prev.length < extraNeeded) {
+        const added = Array.from({ length: extraNeeded - prev.length }, () => ({ fullName: '' }));
+        return [...prev, ...added];
+      }
+      return prev.slice(0, extraNeeded);
+    });
+  }, [travelersCount]);
 
-  const handleNext = () => setStep(s => s + 1);
-  const handleBack = () => setStep(s => s - 1);
-
-  const handleSubmit = async () => {
-    if (!form.startDate || !form.endDate) { setError('Please select travel dates'); return; }
-    setLoading(true);
-    setError('');
+  const loadPackage = async (id) => {
     try {
-      const booking = await bookingsAPI.createBooking({
-        destinationId: form.destinationId,
-        packageType: form.packageType,
-        travelers: form.travelers,
-        startDate: form.startDate,
-        endDate: form.endDate,
-        specialRequests: form.specialRequests,
-      });
-      setSuccess(booking.booking);
+      const res = await packagesAPI.getOne(id);
+      if (res.package) {
+        setPkg(res.package);
+        if (!departureDate || !res.package.availableDates?.includes(departureDate)) {
+          setDepartureDate(res.package.availableDates?.[0] || '');
+        }
+      }
     } catch (err) {
-      // If API fails, simulate success for demo
-      setSuccess({ bookingRef: 'WV' + Date.now().toString(36).toUpperCase(), status: 'confirmed' });
-    } finally {
-      setLoading(false);
+      console.error(err);
     }
   };
 
-  if (success) {
+  const handleLeadChange = (e) => {
+    const { name, value } = e.target;
+    setLeadTraveler(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
+  };
+
+  const handleAdditionalChange = (idx, value) => {
+    setAdditionalTravelers(prev => {
+      const copy = [...prev];
+      copy[idx] = { fullName: value };
+      return copy;
+    });
+  };
+
+  const validateForm = () => {
+    const errs = {};
+    if (!leadTraveler.fullName.trim()) errs.fullName = 'Lead traveler name is required';
+    if (!leadTraveler.email.trim()) {
+      errs.email = 'Email address is required';
+    } else if (!/\S+@\S+\.\S+/.test(leadTraveler.email)) {
+      errs.email = 'Please enter a valid email';
+    }
+    if (!leadTraveler.phone.trim()) {
+      errs.phone = 'Phone number is required';
+    } else if (leadTraveler.phone.trim().length < 8) {
+      errs.phone = 'Please enter a valid phone number';
+    }
+    if (!departureDate) {
+      errs.date = 'Please select a departure date';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleSubmitBooking = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) {
+      window.scrollTo({ top: 300, behavior: 'smooth' });
+      return;
+    }
+
+    if (!pkg) return;
+
+    setSubmitting(true);
+    setApiError('');
+
+    const subtotal = pkg.price * travelersCount;
+    const taxes = Math.round(subtotal * 0.05);
+    const totalPrice = subtotal + taxes;
+
+    try {
+      const payload = {
+        packageId: pkg.id || pkg._id,
+        packageTitle: pkg.title,
+        destination: pkg.destination,
+        country: pkg.country,
+        coverImage: pkg.coverImage,
+        departureDate,
+        travelersCount,
+        leadTraveler,
+        additionalTravelers,
+        specialRequests,
+        pricePerPerson: pkg.price,
+        subtotal,
+        taxes,
+        totalPrice
+      };
+
+      const res = await bookingsAPI.createBooking(payload);
+      if (res.booking) {
+        navigate(`/booking/confirmation/${res.booking.bookingRef || res.booking._id}`, {
+          state: { booking: res.booking }
+        });
+      }
+    } catch (err) {
+      setApiError(err.message || 'Failed to process booking. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!pkg) {
     return (
       <div className={styles.page}>
         <Navbar />
-        <div className={styles.successPage}>
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={styles.successCard}>
-            <div className={styles.successIcon}><CheckCircle size={64} /></div>
-            <h2>Booking Confirmed!</h2>
-            <p>Your adventure to <strong>{form.destinationName}</strong> is booked.</p>
-            <div className={styles.refBox}>
-              <span>Booking Ref</span>
-              <strong>{success.bookingRef}</strong>
-            </div>
-            <div className={styles.successActions}>
-              <Link to="/dashboard" className={styles.primaryBtn}>View My Bookings</Link>
-              <Link to="/destinations" className={styles.outlineBtn}>Explore More</Link>
-            </div>
-          </motion.div>
-        </div>
-        <div style={{ marginTop: 'auto' }}><Footer /></div>
+        <div className={styles.loadingBox}>Loading booking details...</div>
+        <Footer />
       </div>
     );
   }
 
+  const subtotal = pkg.price * travelersCount;
+  const taxes = Math.round(subtotal * 0.05);
+  const totalPrice = subtotal + taxes;
+
   return (
     <div className={styles.page}>
       <Navbar />
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <Link to="/destinations" className={styles.backLink}><ArrowLeft size={18} /> Back to Destinations</Link>
-          <h1 className={styles.title}>Book Your Trip</h1>
-          <p className={styles.subtitle}>Complete your booking in just a few steps</p>
-        </div>
 
-        <div className={styles.stepper}>
-          {[{ n: 1, label: 'Trip Details', icon: MapPin }, { n: 2, label: 'Package', icon: Package }, { n: 3, label: 'Confirm', icon: CreditCard }].map(({ n, label, icon: Icon }) => (
-            <div key={n} className={`${styles.stepItem} ${step >= n ? styles.stepActive : ''} ${step > n ? styles.stepDone : ''}`}>
-              <div className={styles.stepCircle}>{step > n ? <CheckCircle size={18} /> : <Icon size={18} />}</div>
-              <span className={styles.stepLabel}>{label}</span>
-              {n < 3 && <div className={`${styles.stepLine} ${step > n ? styles.stepLineDone : ''}`} />}
+      <main className={styles.main}>
+        <div className={styles.container}>
+          
+          <div className={styles.pageHeader}>
+            <Link to={`/packages/${pkg.id || pkg._id}`} className={styles.backLink}>
+              <ArrowLeft size={16} /> Back to Package Details
+            </Link>
+            <h1 className={styles.pageTitle}>Complete Your Booking</h1>
+            <p className={styles.pageSubtitle}>
+              Confirm your travel dates, traveler details, and review the transparent pricing summary.
+            </p>
+          </div>
+
+          {apiError && (
+            <div className={styles.errorAlert}>
+              <AlertCircle size={18} />
+              <span>{apiError}</span>
             </div>
-          ))}
-        </div>
+          )}
 
-        <div className={styles.formCard}>
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.div key="step1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className={styles.step}>
-                <h3 className={styles.stepTitle}>Trip Details</h3>
+          <div className={styles.grid}>
+            
+            {/* Left Form: Booking Details & Traveler Information */}
+            <div className={styles.formCol}>
+              <form onSubmit={handleSubmitBooking} className={styles.bookingForm}>
+                
+                {/* Section 1: Selected Package & Date */}
+                <div className={styles.cardSection}>
+                  <h2 className={styles.sectionTitle}>1. Tour Package & Departure Date</h2>
 
-                <div className={styles.field}>
-                  <label className={styles.label}><MapPin size={16} /> Destination</label>
-                  <input className={styles.input} value={form.destinationName || 'Select a destination'}
-                    readOnly placeholder="Select destination from Destinations page" />
-                  {!form.destinationId && <Link to="/destinations" className={styles.destLink}>Browse Destinations →</Link>}
-                </div>
-
-                <div className={styles.row}>
+                  {/* Package Selector */}
                   <div className={styles.field}>
-                    <label className={styles.label}><Calendar size={16} /> Start Date</label>
-                    <input type="date" className={styles.input} value={form.startDate}
-                      min={new Date().toISOString().split('T')[0]}
-                      onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} />
+                    <label className={styles.label}>Selected Travel Package</label>
+                    <select
+                      value={selectedPackageId}
+                      onChange={(e) => setSelectedPackageId(e.target.value)}
+                      className={styles.select}
+                    >
+                      {PACKAGES.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.title} — ₹{p.price.toLocaleString('en-IN')}/person ({p.duration})
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}><Calendar size={16} /> End Date</label>
-                    <input type="date" className={styles.input} value={form.endDate}
-                      min={form.startDate || new Date().toISOString().split('T')[0]}
-                      onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} />
-                  </div>
-                </div>
 
-                <div className={styles.field}>
-                  <label className={styles.label}><Users size={16} /> Number of Travelers</label>
-                  <div className={styles.counterWrap}>
-                    <button type="button" className={styles.counterBtn} onClick={() => setForm(p => ({ ...p, travelers: Math.max(1, p.travelers - 1) }))}>-</button>
-                    <span className={styles.counterVal}>{form.travelers}</span>
-                    <button type="button" className={styles.counterBtn} onClick={() => setForm(p => ({ ...p, travelers: Math.min(20, p.travelers + 1) }))}>+</button>
-                  </div>
-                </div>
-
-                <button className={styles.nextBtn} onClick={handleNext} disabled={!form.startDate || !form.endDate}>
-                  Next: Choose Package <ArrowRight size={18} />
-                </button>
-              </motion.div>
-            )}
-
-            {step === 2 && (
-              <motion.div key="step2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className={styles.step}>
-                <h3 className={styles.stepTitle}>Choose Your Package</h3>
-                <div className={styles.packagesGrid}>
-                  {PACKAGES.map(pkg => (
-                    <div key={pkg.id} onClick={() => setForm(p => ({ ...p, packageType: pkg.id }))}
-                      className={`${styles.pkgCard} ${form.packageType === pkg.id ? styles.pkgSelected : ''}`}>
-                      <div className={styles.pkgBadge} style={{ background: pkg.color }}>{pkg.badge}</div>
-                      <h4 className={styles.pkgName}>{pkg.name}</h4>
-                      <div className={styles.pkgPrice}>₹{(form.basePrice * pkg.multiplier).toLocaleString('en-IN')}<span>/person</span></div>
-                      <ul className={styles.pkgFeatures}>
-                        {pkg.features.map((f, i) => <li key={i}><CheckCircle size={14} />{f}</li>)}
-                      </ul>
+                  <div className={styles.formRow}>
+                    {/* Departure Date */}
+                    <div className={styles.field}>
+                      <label className={styles.label}>
+                        <Calendar size={15} /> Departure Date
+                      </label>
+                      <select
+                        value={departureDate}
+                        onChange={(e) => setDepartureDate(e.target.value)}
+                        className={`${styles.select} ${errors.date ? styles.inputError : ''}`}
+                      >
+                        {pkg.availableDates?.map(d => (
+                          <option key={d} value={d}>
+                            {new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'short' })}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.date && <span className={styles.errorText}>{errors.date}</span>}
                     </div>
-                  ))}
-                </div>
-                <div className={styles.navBtns}>
-                  <button className={styles.backBtn} onClick={handleBack}><ArrowLeft size={18} /> Back</button>
-                  <button className={styles.nextBtn} onClick={handleNext}>Next: Confirm <ArrowRight size={18} /></button>
-                </div>
-              </motion.div>
-            )}
 
-            {step === 3 && (
-              <motion.div key="step3" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className={styles.step}>
-                <h3 className={styles.stepTitle}>Confirm Booking</h3>
-                <div className={styles.summary}>
-                  <div className={styles.summaryRow}><span>Destination</span><strong>{form.destinationName || 'N/A'}</strong></div>
-                  <div className={styles.summaryRow}><span>Dates</span><strong>{form.startDate} → {form.endDate}</strong></div>
-                  <div className={styles.summaryRow}><span>Travelers</span><strong>{form.travelers} persons</strong></div>
-                  <div className={styles.summaryRow}><span>Package</span><strong>{selectedPkg?.name}</strong></div>
-                  <div className={`${styles.summaryRow} ${styles.totalRow}`}>
-                    <span>Total Price</span>
-                    <strong>₹{totalPrice.toLocaleString('en-IN')}</strong>
+                    {/* Number of Travelers */}
+                    <div className={styles.field}>
+                      <label className={styles.label}>
+                        <Users size={15} /> Travelers Count
+                      </label>
+                      <div className={styles.counterControl}>
+                        <button
+                          type="button"
+                          className={styles.counterBtn}
+                          onClick={() => setTravelersCount(t => Math.max(1, t - 1))}
+                          disabled={travelersCount <= 1}
+                        >
+                          -
+                        </button>
+                        <span className={styles.counterText}>{travelersCount} Person{travelersCount > 1 ? 's' : ''}</span>
+                        <button
+                          type="button"
+                          className={styles.counterBtn}
+                          onClick={() => setTravelersCount(t => Math.min(10, t + 1))}
+                          disabled={travelersCount >= 10}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className={styles.field}>
-                  <label className={styles.label}>Special Requests (optional)</label>
-                  <textarea className={styles.textarea} rows={3} placeholder="Any dietary requirements, accessibility needs, etc."
-                    value={form.specialRequests} onChange={e => setForm(p => ({ ...p, specialRequests: e.target.value }))} />
+                {/* Section 2: Primary / Lead Traveler Details */}
+                <div className={styles.cardSection}>
+                  <h2 className={styles.sectionTitle}>2. Lead Traveler Information</h2>
+                  <p className={styles.sectionSubtext}>
+                    Primary contact person for booking confirmation and itinerary updates.
+                  </p>
+
+                  <div className={styles.field}>
+                    <label className={styles.label}>Full Name *</label>
+                    <input
+                      type="text"
+                      name="fullName"
+                      placeholder="e.g. Rajesh Sharma"
+                      value={leadTraveler.fullName}
+                      onChange={handleLeadChange}
+                      className={`${styles.input} ${errors.fullName ? styles.inputError : ''}`}
+                    />
+                    {errors.fullName && <span className={styles.errorText}>{errors.fullName}</span>}
+                  </div>
+
+                  <div className={styles.formRow}>
+                    <div className={styles.field}>
+                      <label className={styles.label}>Email Address *</label>
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="rajesh@example.com"
+                        value={leadTraveler.email}
+                        onChange={handleLeadChange}
+                        className={`${styles.input} ${errors.email ? styles.inputError : ''}`}
+                      />
+                      {errors.email && <span className={styles.errorText}>{errors.email}</span>}
+                    </div>
+
+                    <div className={styles.field}>
+                      <label className={styles.label}>Phone Number *</label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        placeholder="+91 98765 43210"
+                        value={leadTraveler.phone}
+                        onChange={handleLeadChange}
+                        className={`${styles.input} ${errors.phone ? styles.inputError : ''}`}
+                      />
+                      {errors.phone && <span className={styles.errorText}>{errors.phone}</span>}
+                    </div>
+                  </div>
                 </div>
 
-                {error && <div className={styles.errorBox}>{error}</div>}
+                {/* Section 3: Additional Travelers (if any) */}
+                {additionalTravelers.length > 0 && (
+                  <div className={styles.cardSection}>
+                    <h2 className={styles.sectionTitle}>3. Additional Co-Traveler Details</h2>
+                    <div className={styles.additionalGrid}>
+                      {additionalTravelers.map((t, idx) => (
+                        <div key={idx} className={styles.field}>
+                          <label className={styles.label}>Traveler {idx + 2} Full Name</label>
+                          <input
+                            type="text"
+                            placeholder={`Traveler ${idx + 2} Name`}
+                            value={t.fullName}
+                            onChange={(e) => handleAdditionalChange(idx, e.target.value)}
+                            className={styles.input}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                <div className={styles.guestInfo}>
-                  <Compass size={16} />
-                  <span>Booking as: <strong>{user?.fullName}</strong> ({user?.email})</span>
+                {/* Section 4: Special Requests */}
+                <div className={styles.cardSection}>
+                  <h2 className={styles.sectionTitle}>Special Requests or Dietary Notes (Optional)</h2>
+                  <textarea
+                    rows={3}
+                    placeholder="E.g., Vegetarian meals, twin bedding request, airport wheelchair assistance, anniversary trip note..."
+                    value={specialRequests}
+                    onChange={(e) => setSpecialRequests(e.target.value)}
+                    className={styles.textarea}
+                  />
                 </div>
 
-                <div className={styles.navBtns}>
-                  <button className={styles.backBtn} onClick={handleBack}><ArrowLeft size={18} /> Back</button>
-                  <button className={styles.confirmBtn} onClick={handleSubmit} disabled={loading}>
-                    {loading ? 'Processing...' : <><CreditCard size={18} /> Confirm & Pay</>}
+                {/* Submit Action */}
+                <div className={styles.actionRow}>
+                  <button
+                    type="submit"
+                    className={styles.submitBtn}
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Confirming Booking...' : (
+                      <>
+                        <Lock size={16} />
+                        Confirm & Reserve Tour (₹{totalPrice.toLocaleString('en-IN')})
+                      </>
+                    )}
                   </button>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
+              </form>
+            </div>
+
+            {/* Right Summary: Sticky Card */}
+            <div className={styles.summaryCol}>
+              <div className={styles.summaryCard}>
+                <h3 className={styles.summaryHeader}>Booking Summary</h3>
+
+                {/* Mini Package preview */}
+                <div className={styles.pkgPreview}>
+                  <img src={pkg.coverImage} alt={pkg.title} className={styles.pkgThumb} />
+                  <div className={styles.pkgInfo}>
+                    <div className={styles.pkgCountry}>{pkg.country} {pkg.flag}</div>
+                    <div className={styles.pkgTitle}>{pkg.title}</div>
+                    <div className={styles.pkgDuration}>{pkg.duration}</div>
+                  </div>
+                </div>
+
+                <hr className={styles.summaryDivider} />
+
+                {/* Details Breakdown */}
+                <div className={styles.summaryMetaList}>
+                  <div className={styles.metaRow}>
+                    <span>Departure Date:</span>
+                    <strong>
+                      {departureDate ? new Date(departureDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not selected'}
+                    </strong>
+                  </div>
+                  <div className={styles.metaRow}>
+                    <span>Travelers:</span>
+                    <strong>{travelersCount} Person{travelersCount > 1 ? 's' : ''}</strong>
+                  </div>
+                  <div className={styles.metaRow}>
+                    <span>Group Style:</span>
+                    <strong>{pkg.groupSize}</strong>
+                  </div>
+                </div>
+
+                <hr className={styles.summaryDivider} />
+
+                {/* Pricing Calculation */}
+                <div className={styles.calcList}>
+                  <div className={styles.calcRow}>
+                    <span>₹{pkg.price.toLocaleString('en-IN')} × {travelersCount} traveler{travelersCount > 1 ? 's' : ''}</span>
+                    <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className={styles.calcRow}>
+                    <span>GST & Travel Services (5%)</span>
+                    <span>₹{taxes.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className={`${styles.calcRow} ${styles.totalCalcRow}`}>
+                    <span>Total Amount Payable</span>
+                    <span className={styles.finalPrice}>₹{totalPrice.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+
+                <div className={styles.reassurance}>
+                  <ShieldCheck size={18} className={styles.shieldIcon} />
+                  <div>
+                    <strong>Zero hidden booking fees</strong>
+                    <p>Instant confirmation voucher issued upon booking.</p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
         </div>
-      </div>
+      </main>
+
+      <Footer />
     </div>
   );
-}
-
-function Footer() {
-  return <footer style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>© 2024 WanderVista. All rights reserved.</footer>;
 }

@@ -1,0 +1,399 @@
+.page {
+  min-height: 100vh;
+  background: #f8fafc;
+  color: var(--text-color, #0f172a);
+}
+
+.main {
+  padding: 3rem 1.5rem 5rem;
+}
+
+.container {
+  max-width: 1060px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2.25rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-color, #0f172a);
+  margin: 0 0 0.4rem;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.newBookingBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #0f172a;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.65rem 1.2rem;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.newBookingBtn:hover {
+  background: #1e293b;
+}
+
+.noticeAlert {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.bookingList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.bookingCard {
+  background: var(--bg-color, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 16px;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
+
+@media (max-width: 720px) {
+  .bookingCard {
+    grid-template-columns: 1fr;
+  }
+}
+
+.imageCol {
+  background: #f1f5f9;
+  height: 100%;
+  min-height: 180px;
+}
+
+.cardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.infoCol {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.refCode {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #2563eb;
+  margin-bottom: 0.2rem;
+}
+
+.pkgTitle {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.pkgTitle a {
+  text-decoration: none;
+  color: var(--text-color, #0f172a);
+}
+
+.pkgTitle a:hover {
+  color: #2563eb;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.3rem 0.65rem;
+  border-radius: 100px;
+  flex-shrink: 0;
+}
+
+.statusConfirmed {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.statusCancelled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.metaGrid {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.requestsSnippet {
+  font-size: 0.85rem;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1.25rem;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.priceWrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.priceLabel {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.totalAmount {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-color, #0f172a);
+}
+
+.btnGroup {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.voucherBtn {
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.voucherBtn:hover {
+  background: #dbeafe;
+}
+
+.cancelBtn {
+  background: none;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancelBtn:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.emptyCard {
+  background: var(--bg-color, #ffffff);
+  border: 1px dashed var(--border, #cbd5e1);
+  border-radius: 16px;
+  padding: 5rem 1.5rem;
+  text-align: center;
+}
+
+.emptyIcon {
+  color: #94a3b8;
+  margin-bottom: 1.25rem;
+}
+
+.emptyCard h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-color, #0f172a);
+  margin: 0 0 0.5rem;
+}
+
+.emptyCard p {
+  color: #64748b;
+  max-width: 450px;
+  margin: 0 auto 1.5rem;
+  line-height: 1.6;
+}
+
+.primaryBtn {
+  display: inline-block;
+  background: #2563eb;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+}
+
+.loadingBox {
+  padding: 8rem 1.5rem;
+  text-align: center;
+  color: #64748b;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Modal */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 500;
+}
+
+.modalCard {
+  background: var(--bg-color, #ffffff);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.modalIconWrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fef2f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+}
+
+.modalAlertIcon {
+  color: #dc2626;
+}
+
+.modalTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-color, #0f172a);
+  margin: 0 0 0.5rem;
+}
+
+.modalDesc {
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0 0 1.75rem;
+}
+
+.modalActions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.modalKeepBtn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.7rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.modalConfirmCancelBtn {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.7rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.modalConfirmCancelBtn:hover {
+  background: #b91c1c;
+}

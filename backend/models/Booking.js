@@ -1,21 +1,34 @@
 const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  destination: { type: mongoose.Schema.Types.ObjectId, ref: 'Destination', required: true },
-  packageType: { type: String, enum: ['starter', 'pro', 'luxury'], required: true },
-  travelers: { type: Number, required: true, min: 1, max: 20 },
-  startDate: { type: Date, required: true },
-  endDate: { type: Date, required: true },
-  totalPrice: { type: Number, required: true },
-  status: { type: String, enum: ['pending', 'confirmed', 'cancelled', 'completed'], default: 'confirmed' },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  packageId: { type: String, required: true },
+  packageTitle: { type: String, required: true },
+  destination: { type: String, required: true },
+  country: { type: String, default: '' },
+  coverImage: { type: String, default: '' },
+  departureDate: { type: String, required: true },
+  travelersCount: { type: Number, required: true, min: 1 },
+  leadTraveler: {
+    fullName: { type: String, required: true },
+    email: { type: String, required: true },
+    phone: { type: String, required: true }
+  },
+  additionalTravelers: [{
+    fullName: { type: String }
+  }],
   specialRequests: { type: String, default: '' },
-  bookingRef: { type: String, unique: true },
+  pricePerPerson: { type: Number, required: true },
+  subtotal: { type: Number, required: true },
+  taxes: { type: Number, required: true },
+  totalPrice: { type: Number, required: true },
+  status: { type: String, enum: ['confirmed', 'cancelled', 'completed'], default: 'confirmed' },
+  bookingRef: { type: String, unique: true }
 }, { timestamps: true });
 
 bookingSchema.pre('save', function(next) {
   if (!this.bookingRef) {
-    this.bookingRef = 'WV' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
+    this.bookingRef = 'WV-' + Math.floor(100000 + Math.random() * 900000);
   }
   next();
 });

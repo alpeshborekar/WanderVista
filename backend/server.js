@@ -6,29 +6,30 @@ const mongoose = require('mongoose');
 const app = express();
 
 // Middleware
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/packages', require('./routes/packages'));
 app.use('/api/destinations', require('./routes/destinations'));
 app.use('/api/bookings', require('./routes/bookings'));
 
 // Health check
-app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'WanderVista API running' }));
+app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'WanderVista API running', port: process.env.PORT || 5001 }));
 
 // 404 handler
 app.use((req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Server error:', err.stack);
   res.status(500).json({ success: false, message: 'Internal server error' });
 });
 
 // Connect DB and start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/wandervista';
 
 mongoose.connect(MONGO_URI)
@@ -37,7 +38,7 @@ mongoose.connect(MONGO_URI)
     app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
   })
   .catch((err) => {
-    console.error('❌ MongoDB connection failed:', err.message);
-    console.log('⚠️  Starting server without DB (limited functionality)...');
+    console.error('❌ MongoDB connection warning:', err.message);
+    console.log('⚠️  Starting server without DB (fallback mode)...');
     app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
   });

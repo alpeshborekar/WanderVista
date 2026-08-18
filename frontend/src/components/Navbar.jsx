@@ -1,176 +1,143 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Compass, Menu, X, Moon, Sun, LogIn, UserPlus, User, LogOut, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { Compass, Menu, X, Moon, Sun, User, LogOut, Calendar, ChevronDown, Compass as ExploreIcon } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import styles from './Navbar.module.css';
 
-const navLinks = [
-  { name: 'Home', id: 'home' },
-  { name: 'Destinations', id: 'destinations' },
-  { name: 'Packages', id: 'packages' },
-  { name: 'Gallery', id: 'gallery' },
-  { name: 'About', id: 'about' },
-  { name: 'Contact', id: 'contact' },
-];
-
-const Navbar = () => {
+export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeLink, setActiveLink] = useState('home');
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const { isDarkMode, toggleTheme } = useTheme();
   const { user, isAuthenticated, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const userMenuRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-      const sections = navLinks.map(link => document.getElementById(link.id));
-      const scrollPosition = window.scrollY + 100;
-      for (let i = sections.length - 1; i >= 0; i--) {
-        const section = sections[i];
-        if (section && section.offsetTop <= scrollPosition) {
-          setActiveLink(navLinks[i].id);
-          break;
-        }
-      }
-    };
+    const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   useEffect(() => {
-    setActiveLink(location.pathname !== '/' ? '' : 'home');
-  }, [location.pathname]);
-
-  useEffect(() => {
     const handleClickOutside = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
-        setUserMenuOpen(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setUserDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const scrollToSection = (e, id) => {
-    e.preventDefault();
-    if (location.pathname !== '/') { window.location.href = `/#${id}`; return; }
-    const section = document.getElementById(id);
-    if (section) section.scrollIntoView({ behavior: 'smooth' });
-    setActiveLink(id);
+  useEffect(() => {
     setMobileMenuOpen(false);
-  };
+    setUserDropdownOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
-    setUserMenuOpen(false);
     navigate('/');
   };
 
-  const initials = user?.fullName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+  const initials = user?.fullName
+    ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : 'U';
 
   return (
-    <nav className={`${styles.navbar} ${isScrolled ? styles.scrolled : ''}`}>
+    <header className={`${styles.header} ${isScrolled ? styles.scrolled : ''}`}>
       <div className={styles.container}>
-        <Link to="/" className={styles.logoContainer}>
-          <Compass className={styles.logoIcon} size={28} />
-          <span className={styles.logoText}>WanderVista</span>
+        <Link to="/" className={styles.brand}>
+          <Compass className={styles.brandIcon} size={26} strokeWidth={2.2} />
+          <span className={styles.brandText}>WanderVista</span>
         </Link>
 
-        <div className={styles.desktopNav}>
-          <ul className={styles.navLinks}>
-            {navLinks.map((link) => (
-              <li key={link.id}>
-                <a href={`#${link.id}`} onClick={(e) => scrollToSection(e, link.id)}
-                  className={`${styles.navLink} ${activeLink === link.id ? styles.active : ''}`}>
-                  {link.name}
-                </a>
-              </li>
-            ))}
-          </ul>
+        {/* Desktop Nav */}
+        <nav className={styles.desktopNav}>
+          <Link to="/" className={`${styles.navLink} ${location.pathname === '/' ? styles.active : ''}`}>
+            All Packages
+          </Link>
+          <Link to="/my-bookings" className={`${styles.navLink} ${location.pathname === '/my-bookings' ? styles.active : ''}`}>
+            My Bookings
+          </Link>
+        </nav>
 
-          <div className={styles.actions}>
-            <button className={styles.themeToggle} onClick={toggleTheme} aria-label="Toggle Theme">
-              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
-
-            {isAuthenticated ? (
-              <div className={styles.userMenu} ref={userMenuRef}>
-                <button className={styles.avatarBtn} onClick={() => setUserMenuOpen(!userMenuOpen)}>
-                  <div className={styles.avatar}>{initials}</div>
-                  <span className={styles.userName}>{user?.fullName?.split(' ')[0]}</span>
-                  <ChevronDown size={16} className={userMenuOpen ? styles.chevronUp : ''} />
-                </button>
-                <AnimatePresence>
-                  {userMenuOpen && (
-                    <motion.div initial={{ opacity: 0, y: -10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.95 }} transition={{ duration: 0.15 }} className={styles.dropdown}>
-                      <Link to="/dashboard" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
-                        <LayoutDashboard size={16} /> Dashboard
-                      </Link>
-                      <Link to="/profile" className={styles.dropdownItem} onClick={() => setUserMenuOpen(false)}>
-                        <User size={16} /> Profile
-                      </Link>
-                      <hr className={styles.dropdownDivider} />
-                      <button className={`${styles.dropdownItem} ${styles.logoutItem}`} onClick={handleLogout}>
-                        <LogOut size={16} /> Logout
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <>
-                <Link to="/login" className={styles.loginBtn}><LogIn size={18} /><span>Login</span></Link>
-                <Link to="/register" className={styles.registerBtn}><UserPlus size={18} /><span>Register</span></Link>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.mobileActions}>
-          <button className={styles.themeToggle} onClick={toggleTheme} aria-label="Toggle Theme">
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        {/* Right Actions */}
+        <div className={styles.actions}>
+          <button className={styles.themeBtn} onClick={toggleTheme} aria-label="Toggle color theme" title="Toggle Theme">
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button className={styles.hamburger} onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle Menu">
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+
+          {isAuthenticated ? (
+            <div className={styles.userDropdownWrapper} ref={dropdownRef}>
+              <button
+                className={styles.userBtn}
+                onClick={() => setUserDropdownOpen(v => !v)}
+                aria-expanded={userDropdownOpen}
+              >
+                <div className={styles.avatar}>{initials}</div>
+                <span className={styles.userName}>{user?.fullName?.split(' ')[0] || 'Account'}</span>
+                <ChevronDown size={15} className={`${styles.chevron} ${userDropdownOpen ? styles.chevronOpen : ''}`} />
+              </button>
+
+              {userDropdownOpen && (
+                <div className={styles.dropdownMenu}>
+                  <div className={styles.dropdownHeader}>
+                    <div className={styles.dropdownName}>{user?.fullName}</div>
+                    <div className={styles.dropdownEmail}>{user?.email}</div>
+                  </div>
+                  <hr className={styles.dropdownDivider} />
+                  <Link to="/my-bookings" className={styles.dropdownItem}>
+                    <Calendar size={16} /> My Bookings
+                  </Link>
+                  <Link to="/profile" className={styles.dropdownItem}>
+                    <User size={16} /> Profile Settings
+                  </Link>
+                  <hr className={styles.dropdownDivider} />
+                  <button className={`${styles.dropdownItem} ${styles.logoutItem}`} onClick={handleLogout}>
+                    <LogOut size={16} /> Log Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={styles.authButtons}>
+              <Link to="/login" className={styles.loginBtn}>Sign In</Link>
+              <Link to="/register" className={styles.registerBtn}>Create Account</Link>
+            </div>
+          )}
+
+          {/* Mobile hamburger */}
+          <button
+            className={styles.mobileToggle}
+            onClick={() => setMobileMenuOpen(v => !v)}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </div>
 
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className={styles.mobileMenu}>
-            <ul className={styles.mobileNavLinks}>
-              {navLinks.map((link) => (
-                <li key={link.id}>
-                  <a href={`#${link.id}`} onClick={(e) => scrollToSection(e, link.id)}
-                    className={`${styles.mobileNavLink} ${activeLink === link.id ? styles.active : ''}`}>{link.name}</a>
-                </li>
-              ))}
-            </ul>
-            <div className={styles.mobileAuthLinks}>
-              {isAuthenticated ? (
-                <>
-                  <Link to="/dashboard" className={styles.loginBtn} onClick={() => setMobileMenuOpen(false)}><LayoutDashboard size={18} /><span>Dashboard</span></Link>
-                  <button className={styles.registerBtn} onClick={() => { logout(); setMobileMenuOpen(false); navigate('/'); }}><LogOut size={18} /><span>Logout</span></button>
-                </>
-              ) : (
-                <>
-                  <Link to="/login" className={styles.loginBtn} onClick={() => setMobileMenuOpen(false)}><LogIn size={18} /><span>Login</span></Link>
-                  <Link to="/register" className={styles.registerBtn} onClick={() => setMobileMenuOpen(false)}><UserPlus size={18} /><span>Register</span></Link>
-                </>
-              )}
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div className={styles.mobileMenu}>
+          <Link to="/" className={styles.mobileLink}>All Packages</Link>
+          <Link to="/my-bookings" className={styles.mobileLink}>My Bookings</Link>
+          <hr className={styles.mobileDivider} />
+          {isAuthenticated ? (
+            <>
+              <Link to="/profile" className={styles.mobileLink}>Profile Settings</Link>
+              <button className={`${styles.mobileLink} ${styles.mobileLogout}`} onClick={handleLogout}>Log Out</button>
+            </>
+          ) : (
+            <div className={styles.mobileAuthRow}>
+              <Link to="/login" className={styles.loginBtn}>Sign In</Link>
+              <Link to="/register" className={styles.registerBtn}>Create Account</Link>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
+          )}
+        </div>
+      )}
+    </header>
   );
-};
-
-export default Navbar;
+}
