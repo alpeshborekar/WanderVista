@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { Star, MapPin, ArrowRight } from 'lucide-react';
 import styles from './Destinations.module.css';
 
@@ -135,15 +136,15 @@ const Destinations = () => {
                   <span>{dest.rating.toFixed(1)}</span>
                 </div>
                 <div className={styles.price}>
-                  From ${dest.price.toLocaleString()}
+                  From ₹{dest.price.toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
 
             <div className={styles.hoverContent}>
-              <button className={styles.bookButton}>
+              <Link to={`/booking?dest=${dest.id}`} className={styles.bookButton}>
                 Book Now <ArrowRight size={18} />
-              </button>
+              </Link>
             </div>
           </motion.div>
         ))}

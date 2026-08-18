@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Check, CalendarDays, Utensils, Building2, Car, UserCheck, Crown, Zap, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import styles from './Packages.module.css';
 
 const packages = [
@@ -135,10 +136,10 @@ export default function Packages() {
                 })}
               </ul>
 
-              <button className={`${styles.cardBtn} ${pkg.popular ? styles.primaryBtn : styles.outlineBtn}`}>
+              <Link to="/destinations" className={`${styles.cardBtn} ${pkg.popular ? styles.primaryBtn : styles.outlineBtn}`}>
                 {pkg.buttonText}
                 <Check size={16} />
-              </button>
+              </Link>
             </motion.div>
           ))}
         </motion.div>
