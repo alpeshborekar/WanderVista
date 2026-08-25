@@ -8,6 +8,7 @@ import Booking from './pages/Booking';
 import BookingConfirmation from './pages/BookingConfirmation';
 import MyBookings from './pages/MyBookings';
 import Profile from './pages/Profile';
+import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -27,6 +28,8 @@ export default function App() {
 
             {/* User Management & Bookings */}
             <Route path="/my-bookings" element={<MyBookings />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/analytics" element={<Navigate to="/admin" replace />} />
             <Route path="/dashboard" element={<Navigate to="/my-bookings" replace />} />
             <Route path="/destinations" element={<Navigate to="/" replace />} />
             <Route path="/profile" element={<Profile />} />

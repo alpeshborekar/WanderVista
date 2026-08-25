@@ -178,6 +178,61 @@ export const bookingsAPI = {
   }
 };
 
+// Analytics API
+export const analyticsAPI = {
+  getStats: async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/analytics/stats`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.summary) return data;
+      }
+    } catch (e) {
+      // fallback to local calculation
+    }
+
+    const bookings = getLocalBookings();
+    const confirmed = bookings.filter(b => b.status === 'confirmed');
+    const cancelled = bookings.filter(b => b.status === 'cancelled');
+    const totalRevenue = confirmed.reduce((s, b) => s + (b.totalPrice || 0), 0);
+
+    // Group by package
+    const pkgMap = {};
+    confirmed.forEach(b => {
+      const key = b.packageTitle || 'Unknown';
+      if (!pkgMap[key]) pkgMap[key] = { _id: key, totalRevenue: 0, bookingsCount: 0 };
+      pkgMap[key].totalRevenue += b.totalPrice || 0;
+      pkgMap[key].bookingsCount += 1;
+    });
+
+    return {
+      success: true,
+      summary: {
+        totalRevenue,
+        totalBookings: bookings.length,
+        confirmedBookings: confirmed.length,
+        cancelledBookings: cancelled.length,
+        totalPackages: PACKAGES.length,
+        totalUsers: 1
+      },
+      charts: {
+        revenueByPackage: Object.values(pkgMap),
+        statusDistribution: [
+          { status: 'Confirmed', count: confirmed.length, color: '#16a34a' },
+          { status: 'Cancelled', count: cancelled.length, color: '#dc2626' }
+        ],
+        categoryDistribution: [
+          { category: 'Mountain & Alpine', count: 2 },
+          { category: 'Cultural Heritage', count: 3 },
+          { category: 'Beach & Coastal', count: 2 },
+          { category: 'City Exploration', count: 1 }
+        ]
+      },
+      recentBookings: bookings.slice(0, 10)
+    };
+  }
+};
+
 // Auth API
 export const authAPI = {
   register: (body) => fetch(`${BASE_URL}/auth/register`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) }).then(handleResponse),
@@ -186,3 +241,5 @@ export const authAPI = {
   updateProfile: (body) => fetch(`${BASE_URL}/auth/profile`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) }).then(handleResponse),
   changePassword: (body) => fetch(`${BASE_URL}/auth/change-password`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) }).then(handleResponse)
 };
+
+
