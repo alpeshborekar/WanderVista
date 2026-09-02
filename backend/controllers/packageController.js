@@ -3,8 +3,10 @@ const Package = require('../models/Package');
 exports.getAllPackages = async (req, res) => {
   try {
     const { category, search, sort, maxPrice } = req.query;
-    let query = {};
-    if (category && category !== 'all') {
+    // Customer listing only returns active packages
+    let query = { isActive: { $ne: false } };
+
+    if (category && category !== 'all' && category !== 'All Styles') {
       query.category = category;
     }
     if (search) {
@@ -27,18 +29,22 @@ exports.getAllPackages = async (req, res) => {
     const packages = await Package.find(query).sort(sortObj);
     res.json({ success: true, count: packages.length, packages });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error fetching packages.' });
   }
 };
 
 exports.getPackageById = async (req, res) => {
   try {
-    const pkg = await Package.findOne({ $or: [{ id: req.params.id }, { _id: req.params.id }] });
+    const pkg = await Package.findOne({
+      $or: [{ id: req.params.id }, { _id: req.params.id }],
+      isActive: { $ne: false }
+    });
+
     if (!pkg) {
-      return res.status(404).json({ success: false, message: 'Package not found' });
+      return res.status(404).json({ success: false, message: 'Tour package not found or currently unavailable.' });
     }
     res.json({ success: true, package: pkg });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error retrieving package.' });
   }
 };

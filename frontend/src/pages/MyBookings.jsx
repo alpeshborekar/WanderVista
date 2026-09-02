@@ -51,6 +51,42 @@ export default function MyBookings() {
     }
   };
 
+  const renderStatusBadge = (status) => {
+    switch (status) {
+      case 'confirmed':
+        return (
+          <span className={`${styles.statusBadge} ${styles.statusConfirmed}`}>
+            <CheckCircle size={14} /> Confirmed
+          </span>
+        );
+      case 'rejected':
+        return (
+          <span className={`${styles.statusBadge} ${styles.statusRejected}`}>
+            <XCircle size={14} /> Rejected
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className={`${styles.statusBadge} ${styles.statusCancelled}`}>
+            <XCircle size={14} /> Cancelled
+          </span>
+        );
+      case 'completed':
+        return (
+          <span className={`${styles.statusBadge} ${styles.statusCompleted}`}>
+            <CheckCircle size={14} /> Completed
+          </span>
+        );
+      case 'pending':
+      default:
+        return (
+          <span className={`${styles.statusBadge} ${styles.statusPending}`}>
+            <Clock size={14} /> Pending Organization Confirmation
+          </span>
+        );
+    }
+  };
+
   return (
     <div className={styles.page}>
       <Navbar />
@@ -62,12 +98,17 @@ export default function MyBookings() {
             <div>
               <h1 className={styles.title}>My Bookings</h1>
               <p className={styles.subtitle}>
-                Review your upcoming expeditions, confirmed reservations, and booking references.
+                Review your upcoming expeditions, booking statuses, and travel vouchers.
               </p>
             </div>
-            <Link to="/" className={styles.newBookingBtn}>
-              <Compass size={16} /> Explore New Tours
-            </Link>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button onClick={fetchBookings} className={styles.refreshBtn} title="Check latest booking status">
+                <RotateCcw size={14} /> Refresh Status
+              </button>
+              <Link to="/" className={styles.newBookingBtn}>
+                <Compass size={16} /> Explore New Tours
+              </Link>
+            </div>
           </div>
 
           {actionMessage && (
@@ -95,6 +136,7 @@ export default function MyBookings() {
             <div className={styles.bookingList}>
               {bookings.map((b) => {
                 const isCancelled = b.status === 'cancelled';
+                const isRejected = b.status === 'rejected';
                 return (
                   <div key={b._id || b.bookingRef} className={styles.bookingCard}>
                     
@@ -112,23 +154,13 @@ export default function MyBookings() {
                       
                       <div className={styles.cardTop}>
                         <div>
-                          <div className={styles.refCode}>Ref: {b.bookingRef}</div>
+                          <div className={styles.refCode}>Booking Ref: {b.bookingRef}</div>
                           <h3 className={styles.pkgTitle}>
                             <Link to={`/packages/${b.packageId}`}>{b.packageTitle}</Link>
                           </h3>
                         </div>
 
-                        <div className={`${styles.statusBadge} ${isCancelled ? styles.statusCancelled : styles.statusConfirmed}`}>
-                          {isCancelled ? (
-                            <>
-                              <XCircle size={14} /> Cancelled
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle size={14} /> Confirmed
-                            </>
-                          )}
-                        </div>
+                        {renderStatusBadge(b.status)}
                       </div>
 
                       <div className={styles.metaGrid}>
@@ -150,6 +182,13 @@ export default function MyBookings() {
                         </div>
                       </div>
 
+                      {b.status === 'pending' && (
+                        <div className={styles.pendingNoticeBox}>
+                          <Clock size={15} />
+                          <span>Your reservation is currently being reviewed and will be confirmed shortly by our operations team.</span>
+                        </div>
+                      )}
+
                       {b.specialRequests && (
                         <div className={styles.requestsSnippet}>
                           <strong>Special Request:</strong> {b.specialRequests}
@@ -159,7 +198,7 @@ export default function MyBookings() {
                       {/* Card Footer: Total Price & Actions */}
                       <div className={styles.cardFooter}>
                         <div className={styles.priceWrap}>
-                          <span className={styles.priceLabel}>Total Paid</span>
+                          <span className={styles.priceLabel}>Total Reservation Price</span>
                           <span className={styles.totalAmount}>₹{b.totalPrice?.toLocaleString('en-IN')}</span>
                         </div>
 
@@ -169,10 +208,10 @@ export default function MyBookings() {
                             state={{ booking: b }}
                             className={styles.voucherBtn}
                           >
-                            View Receipt
+                            View Booking Voucher
                           </Link>
 
-                          {!isCancelled && (
+                          {!isCancelled && !isRejected && b.status !== 'completed' && (
                             <button
                               onClick={() => setShowCancelModal(b)}
                               className={styles.cancelBtn}

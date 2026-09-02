@@ -782,3 +782,257 @@
   border-radius: 8px;
   cursor: pointer;
 }
+
+/* Toggle Active Button */
+.toggleActiveBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.775rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btnActiveOn {
+  background: rgba(34, 197, 94, 0.18);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+
+.btnActiveOn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.btnActiveOff {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.btnActiveOff:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+
+/* Availability Styles */
+.availSelectorBox {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #1f2937;
+  border: 1px solid #374151;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+}
+
+.availSelectorBox label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.availPkgSelect {
+  flex: 1;
+  padding: 0.65rem 0.9rem;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.addDateForm {
+  background: #1f2937;
+  border: 1px solid #374151;
+  padding: 1.25rem;
+  border-radius: 10px;
+}
+
+.addDateInputs {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.inputLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin-bottom: 0.35rem;
+}
+
+.dateInput, .capacityInput {
+  padding: 0.6rem 0.85rem;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.btnActionSecondary {
+  background: #374151;
+  border: none;
+  color: #d1d5db;
+  font-size: 0.775rem;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btnActionSecondary:hover {
+  background: #4b5563;
+  color: #ffffff;
+}
+
+/* Status Buttons */
+.btnReject {
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+.statusPending {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.statusRejected {
+  background: rgba(185, 28, 28, 0.25);
+  color: #fca5a5;
+  border: 1px solid rgba(185, 28, 28, 0.5);
+}
+
+.meterAmber {
+  background: #f59e0b;
+}
+
+.pendingBadgeMini {
+  background: #f59e0b;
+  color: #000000;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.15rem 0.45rem;
+  border-radius: 100px;
+  margin-left: 0.35rem;
+}
+
+.btnViewDetails {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: #374151;
+  color: #60a5fa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btnViewDetails:hover {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.quickActionLinks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.quickActionBtn {
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #60a5fa;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quickActionBtn:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+/* Booking Detail Modal Content */
+.bookingDetailBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.detailSection {
+  background: #0f172a;
+  border: 1px solid #334155;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+}
+
+.detailSection h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #60a5fa;
+  margin: 0 0 0.6rem;
+}
+
+.detailSection p {
+  margin: 0 0 0.35rem;
+  font-size: 0.875rem;
+  color: #cbd5e1;
+}
+
+.detailSection ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  color: #cbd5e1;
+}
+
+.reqText {
+  background: rgba(245, 158, 11, 0.1);
+  border-left: 3px solid #f59e0b;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  color: #fbbf24;
+}
+
+.modalStatusButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+}
+
+.modalStatusButtons span {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #9ca3af;
+}

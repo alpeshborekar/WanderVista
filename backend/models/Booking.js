@@ -22,7 +22,12 @@ const bookingSchema = new mongoose.Schema({
   subtotal: { type: Number, required: true },
   taxes: { type: Number, required: true },
   totalPrice: { type: Number, required: true },
-  status: { type: String, enum: ['confirmed', 'cancelled', 'completed'], default: 'confirmed' },
+  status: {
+    type: String,
+    enum: ['pending', 'confirmed', 'rejected', 'cancelled', 'completed'],
+    default: 'pending'
+  },
+  adminNotes: { type: String, default: '' },
   bookingRef: { type: String, unique: true }
 }, { timestamps: true });
 

@@ -3,7 +3,7 @@ import {
   TrendingUp, Calendar, Users, Package, Database, CheckCircle,
   XCircle, ArrowLeft, RefreshCw, BarChart2, Shield, LogOut,
   Plus, Edit, Trash2, Search, Filter, Clock, MapPin, DollarSign,
-  AlertTriangle, X, Check
+  AlertTriangle, X, Check, ToggleLeft, ToggleRight, Eye, Ban
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../context/AdminAuthContext';
@@ -14,7 +14,7 @@ export default function AdminDashboard() {
   const { adminUser, adminLogout } = useAdminAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('analytics'); // analytics, packages, bookings, customers
+  const [activeTab, setActiveTab] = useState('analytics'); // analytics, packages, availability, bookings, customers
   const [stats, setStats] = useState(null);
   const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -26,6 +26,9 @@ export default function AdminDashboard() {
   // Booking filters & search
   const [bookingFilter, setBookingFilter] = useState('all');
   const [bookingSearch, setBookingSearch] = useState('');
+
+  // Booking Detail Modal
+  const [selectedBooking, setSelectedBooking] = useState(null);
 
   // Package Modal (Create / Edit)
   const [showPkgModal, setShowPkgModal] = useState(false);
@@ -41,10 +44,17 @@ export default function AdminDashboard() {
     days: 7,
     nights: 6,
     groupSize: 'Max 12 travelers',
+    capacity: 12,
     coverImage: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1000&q=80',
     shortDescription: '',
-    overview: ''
+    overview: '',
+    isActive: true
   });
+
+  // Availability Management State
+  const [selectedPkgForAvail, setSelectedPkgForAvail] = useState(null);
+  const [newAvailDate, setNewAvailDate] = useState('');
+  const [newAvailCapacity, setNewAvailCapacity] = useState(12);
 
   useEffect(() => {
     loadAllAdminData();
@@ -61,7 +71,11 @@ export default function AdminDashboard() {
       ]);
 
       setStats(statsRes);
-      setPackages(pkgRes.packages || []);
+      const pkgsList = pkgRes.packages || [];
+      setPackages(pkgsList);
+      if (pkgsList.length > 0 && !selectedPkgForAvail) {
+        setSelectedPkgForAvail(pkgsList[0]);
+      }
       setBookings(bkgRes.bookings || []);
       setCustomers(custRes.customers || []);
     } catch (err) {
@@ -82,20 +96,38 @@ export default function AdminDashboard() {
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // Booking Status Update
+  // Booking Status Update (Confirm, Reject, Cancel, Complete)
   const handleUpdateStatus = async (bookingId, newStatus) => {
     try {
       await adminAPI.updateBookingStatus(bookingId, newStatus);
-      showToast(`Booking status updated to ${newStatus}.`);
+      showToast(`Booking ${bookingId} status updated to ${newStatus}.`);
       setBookings(prev =>
         prev.map(b => (b._id === bookingId || b.bookingRef === bookingId) ? { ...b, status: newStatus } : b)
       );
+      if (selectedBooking && (selectedBooking._id === bookingId || selectedBooking.bookingRef === bookingId)) {
+        setSelectedBooking(prev => ({ ...prev, status: newStatus }));
+      }
     } catch (err) {
       showToast(err.message || 'Failed to update status', 'error');
     }
   };
 
-  // Package Management (Add / Edit / Delete)
+  // Package Active Toggle
+  const handleToggleActive = async (pkg) => {
+    const pkgId = pkg.id || pkg._id;
+    try {
+      const res = await adminAPI.togglePackageActive(pkgId);
+      const newActive = res.isActive !== undefined ? res.isActive : !pkg.isActive;
+      showToast(`Package ${pkg.title} is now ${newActive ? 'Active (Visible to customers)' : 'Disabled (Hidden from catalog)'}.`);
+      setPackages(prev =>
+        prev.map(p => (p.id === pkgId || p._id === pkgId) ? { ...p, isActive: newActive } : p)
+      );
+    } catch (err) {
+      showToast('Failed to toggle package state.', 'error');
+    }
+  };
+
+  // Package Modal Open (Add / Edit)
   const handleOpenAddPkg = () => {
     setEditingPkg(null);
     setPkgFormData({
@@ -109,9 +141,11 @@ export default function AdminDashboard() {
       days: 7,
       nights: 6,
       groupSize: 'Max 12 travelers',
+      capacity: 12,
       coverImage: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1000&q=80',
       shortDescription: '',
-      overview: ''
+      overview: '',
+      isActive: true
     });
     setShowPkgModal(true);
   };
@@ -129,9 +163,11 @@ export default function AdminDashboard() {
       days: pkg.days || 7,
       nights: pkg.nights || 6,
       groupSize: pkg.groupSize || 'Max 12 travelers',
+      capacity: pkg.capacity || 12,
       coverImage: pkg.coverImage || '',
       shortDescription: pkg.shortDescription || '',
-      overview: pkg.overview || ''
+      overview: pkg.overview || '',
+      isActive: pkg.isActive !== false
     });
     setShowPkgModal(true);
   };
@@ -152,7 +188,7 @@ export default function AdminDashboard() {
         );
       } else {
         const res = await adminAPI.createPackage(pkgFormData);
-        showToast('New tour package added to catalog.');
+        showToast('New tour package created and published.');
         if (res.package) setPackages(prev => [res.package, ...prev]);
       }
       setShowPkgModal(false);
@@ -162,13 +198,79 @@ export default function AdminDashboard() {
   };
 
   const handleDeletePkg = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this tour package from the catalog?')) return;
+    if (!window.confirm('Are you sure you want to permanently remove this package?')) return;
     try {
       await adminAPI.deletePackage(id);
       showToast('Package deleted from catalog.');
       setPackages(prev => prev.filter(p => p.id !== id && p._id !== id));
     } catch (err) {
       showToast(err.message || 'Failed to delete package.', 'error');
+    }
+  };
+
+  // Availability Actions
+  const handleAddAvailDate = async (e) => {
+    e.preventDefault();
+    if (!newAvailDate || !selectedPkgForAvail) return;
+    const pkgId = selectedPkgForAvail.id || selectedPkgForAvail._id;
+
+    try {
+      await adminAPI.updateAvailability(pkgId, {
+        date: newAvailDate,
+        capacity: Number(newAvailCapacity) || 12,
+        action: 'add'
+      });
+      showToast(`Departure date ${newAvailDate} added with capacity ${newAvailCapacity}.`);
+      
+      // Update local state
+      const updatedDates = [...(selectedPkgForAvail.availableDates || []), newAvailDate];
+      const updatedSchedule = [
+        ...(selectedPkgForAvail.schedule || []),
+        { date: newAvailDate, capacity: Number(newAvailCapacity) || 12, bookedSpots: 0, isClosed: false }
+      ];
+      
+      const updatedPkg = { ...selectedPkgForAvail, availableDates: updatedDates, schedule: updatedSchedule };
+      setSelectedPkgForAvail(updatedPkg);
+      setPackages(prev => prev.map(p => (p.id === pkgId || p._id === pkgId) ? updatedPkg : p));
+      setNewAvailDate('');
+    } catch (err) {
+      showToast('Failed to add departure date.', 'error');
+    }
+  };
+
+  const handleToggleCloseDate = async (date) => {
+    if (!selectedPkgForAvail) return;
+    const pkgId = selectedPkgForAvail.id || selectedPkgForAvail._id;
+
+    try {
+      await adminAPI.updateAvailability(pkgId, { date, action: 'toggleClosed' });
+      const updatedSchedule = (selectedPkgForAvail.schedule || []).map(s =>
+        s.date === date ? { ...s, isClosed: !s.isClosed } : s
+      );
+      const updatedPkg = { ...selectedPkgForAvail, schedule: updatedSchedule };
+      setSelectedPkgForAvail(updatedPkg);
+      setPackages(prev => prev.map(p => (p.id === pkgId || p._id === pkgId) ? updatedPkg : p));
+      showToast(`Departure date ${date} availability status toggled.`);
+    } catch (err) {
+      showToast('Failed to toggle date status.', 'error');
+    }
+  };
+
+  const handleRemoveDate = async (date) => {
+    if (!selectedPkgForAvail) return;
+    if (!window.confirm(`Remove departure date ${date}?`)) return;
+    const pkgId = selectedPkgForAvail.id || selectedPkgForAvail._id;
+
+    try {
+      await adminAPI.updateAvailability(pkgId, { date, action: 'remove' });
+      const updatedDates = (selectedPkgForAvail.availableDates || []).filter(d => d !== date);
+      const updatedSchedule = (selectedPkgForAvail.schedule || []).filter(s => s.date !== date);
+      const updatedPkg = { ...selectedPkgForAvail, availableDates: updatedDates, schedule: updatedSchedule };
+      setSelectedPkgForAvail(updatedPkg);
+      setPackages(prev => prev.map(p => (p.id === pkgId || p._id === pkgId) ? updatedPkg : p));
+      showToast(`Departure date ${date} removed.`);
+    } catch (err) {
+      showToast('Failed to remove departure date.', 'error');
     }
   };
 
@@ -185,11 +287,15 @@ export default function AdminDashboard() {
   });
 
   const summary = stats?.summary || {
-    totalRevenue: bookings.filter(b => b.status === 'confirmed').reduce((s, b) => s + (b.totalPrice || 0), 0),
+    totalRevenue: bookings.filter(b => b.status === 'confirmed' || b.status === 'completed').reduce((s, b) => s + (b.totalPrice || 0), 0),
     totalBookings: bookings.length,
+    pendingBookings: bookings.filter(b => b.status === 'pending').length,
     confirmedBookings: bookings.filter(b => b.status === 'confirmed').length,
+    rejectedBookings: bookings.filter(b => b.status === 'rejected').length,
     cancelledBookings: bookings.filter(b => b.status === 'cancelled').length,
-    totalPackages: packages.length || 6,
+    completedBookings: bookings.filter(b => b.status === 'completed').length,
+    totalPackages: packages.length || 4,
+    activePackages: packages.filter(p => p.isActive !== false).length,
     totalCustomers: customers.length || 1
   };
 
@@ -198,14 +304,14 @@ export default function AdminDashboard() {
   return (
     <div className={styles.adminLayout}>
       
-      {/* Top Admin Navigation Bar */}
+      {/* Top Admin Header */}
       <header className={styles.adminHeader}>
         <div className={styles.headerLeft}>
           <div className={styles.brandBadge}>
             <Shield size={18} className={styles.shieldIcon} />
-            <span>WanderVista Admin Portal</span>
+            <span>WanderVista Organization Control Center</span>
           </div>
-          <span className={styles.envTag}>Production Mode</span>
+          <span className={styles.envTag}>Official Platform Admin</span>
         </div>
 
         <div className={styles.headerRight}>
@@ -214,7 +320,7 @@ export default function AdminDashboard() {
               {adminUser?.fullName?.slice(0, 2).toUpperCase() || 'AD'}
             </div>
             <div className={styles.adminDetails}>
-              <span className={styles.adminName}>{adminUser?.fullName || 'Administrator'}</span>
+              <span className={styles.adminName}>{adminUser?.fullName || 'Organization Admin'}</span>
               <span className={styles.adminEmail}>{adminUser?.email || 'admin@wandervista.com'}</span>
             </div>
           </div>
@@ -229,14 +335,14 @@ export default function AdminDashboard() {
       {/* Main Container */}
       <div className={styles.mainContainer}>
         
-        {/* Sub-header & Navigation Tabs */}
+        {/* Navigation Tabs */}
         <div className={styles.controlStrip}>
           <div className={styles.tabGroup}>
             <button
               onClick={() => setActiveTab('analytics')}
               className={`${styles.tabBtn} ${activeTab === 'analytics' ? styles.tabActive : ''}`}
             >
-              <BarChart2 size={16} /> Analytics & KPI Overview
+              <BarChart2 size={16} /> Operations & Analytics
             </button>
             <button
               onClick={() => setActiveTab('packages')}
@@ -245,22 +351,31 @@ export default function AdminDashboard() {
               <Package size={16} /> Manage Packages ({packages.length})
             </button>
             <button
+              onClick={() => setActiveTab('availability')}
+              className={`${styles.tabBtn} ${activeTab === 'availability' ? styles.tabActive : ''}`}
+            >
+              <Clock size={16} /> Manage Availability & Capacity
+            </button>
+            <button
               onClick={() => setActiveTab('bookings')}
               className={`${styles.tabBtn} ${activeTab === 'bookings' ? styles.tabActive : ''}`}
             >
               <Calendar size={16} /> Manage Bookings ({bookings.length})
+              {summary.pendingBookings > 0 && (
+                <span className={styles.pendingBadgeMini}>{summary.pendingBookings} New</span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab('customers')}
               className={`${styles.tabBtn} ${activeTab === 'customers' ? styles.tabActive : ''}`}
             >
-              <Users size={16} /> Manage Customers ({customers.length})
+              <Users size={16} /> Customers ({customers.length})
             </button>
           </div>
 
           <button onClick={loadAllAdminData} className={styles.refreshBtn} disabled={refreshing}>
             <RefreshCw size={14} className={refreshing ? styles.spinning : ''} />
-            <span>Sync Live DB</span>
+            <span>Sync Database</span>
           </button>
         </div>
 
@@ -273,7 +388,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 1: ANALYTICS & KPI OVERVIEW */}
+        {/* TAB 1: OPERATIONS & ANALYTICS */}
         {/* ========================================================= */}
         {activeTab === 'analytics' && (
           <div className={styles.tabContent}>
@@ -287,7 +402,18 @@ export default function AdminDashboard() {
                 <div>
                   <div className={styles.kpiLabel}>Total Confirmed Revenue</div>
                   <div className={styles.kpiValue}>₹{summary.totalRevenue.toLocaleString('en-IN')}</div>
-                  <div className={styles.kpiSub}>From {summary.confirmedBookings} active reservations</div>
+                  <div className={styles.kpiSub}>From confirmed customer expeditions</div>
+                </div>
+              </div>
+
+              <div className={styles.kpiCard}>
+                <div className={styles.kpiIcon} style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>
+                  <Clock size={22} />
+                </div>
+                <div>
+                  <div className={styles.kpiLabel}>Pending Bookings</div>
+                  <div className={styles.kpiValue} style={{ color: '#fbbf24' }}>{summary.pendingBookings}</div>
+                  <div className={styles.kpiSub}>Awaiting organization review & confirmation</div>
                 </div>
               </div>
 
@@ -296,7 +422,7 @@ export default function AdminDashboard() {
                   <Calendar size={22} />
                 </div>
                 <div>
-                  <div className={styles.kpiLabel}>Total Reservations</div>
+                  <div className={styles.kpiLabel}>Total Bookings</div>
                   <div className={styles.kpiValue}>{summary.totalBookings}</div>
                   <div className={styles.kpiSub}>
                     <span style={{ color: '#4ade80' }}>{summary.confirmedBookings} Confirmed</span> · <span style={{ color: '#f87171' }}>{summary.cancelledBookings} Cancelled</span>
@@ -309,20 +435,9 @@ export default function AdminDashboard() {
                   <Package size={22} />
                 </div>
                 <div>
-                  <div className={styles.kpiLabel}>Tour Packages in Catalog</div>
-                  <div className={styles.kpiValue}>{summary.totalPackages}</div>
-                  <div className={styles.kpiSub}>Active global itineraries</div>
-                </div>
-              </div>
-
-              <div className={styles.kpiCard}>
-                <div className={styles.kpiIcon} style={{ background: 'rgba(217, 119, 6, 0.15)', color: '#fbbf24' }}>
-                  <Users size={22} />
-                </div>
-                <div>
-                  <div className={styles.kpiLabel}>Registered Customers</div>
-                  <div className={styles.kpiValue}>{summary.totalCustomers}</div>
-                  <div className={styles.kpiSub}>Customer Accounts in MongoDB</div>
+                  <div className={styles.kpiLabel}>Active Packages</div>
+                  <div className={styles.kpiValue}>{summary.activePackages} / {summary.totalPackages}</div>
+                  <div className={styles.kpiSub}>Published in customer catalog</div>
                 </div>
               </div>
             </div>
@@ -333,7 +448,7 @@ export default function AdminDashboard() {
               {/* Revenue by Package */}
               <div className={styles.chartPanel}>
                 <h3 className={styles.panelTitle}>Revenue by Tour Package (₹)</h3>
-                <p className={styles.panelSub}>Aggregated confirmed income per package</p>
+                <p className={styles.panelSub}>Direct income generated per package</p>
 
                 <div className={styles.barList}>
                   {stats?.charts?.revenueByPackage?.length > 0 ? (
@@ -343,7 +458,7 @@ export default function AdminDashboard() {
                         <div key={idx} className={styles.barItem}>
                           <div className={styles.barMeta}>
                             <span className={styles.barName}>{item._id}</span>
-                            <span className={styles.barVal}>₹{item.totalRevenue.toLocaleString('en-IN')} ({item.bookingsCount} bookings)</span>
+                            <span className={styles.barVal}>₹{item.totalRevenue.toLocaleString('en-IN')} ({item.bookingsCount} confirmed)</span>
                           </div>
                           <div className={styles.barTrack}>
                             <div
@@ -362,13 +477,19 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Status Ratio & Categories */}
+              {/* Status Breakdown & Categories */}
               <div className={styles.chartPanel}>
-                <h3 className={styles.panelTitle}>Booking Status Distribution</h3>
-                <p className={styles.panelSub}>Ratio of confirmed vs cancelled reservations</p>
+                <h3 className={styles.panelTitle}>Reservation Status Breakdown</h3>
+                <p className={styles.panelSub}>Direct booking pipeline</p>
 
                 <div className={styles.statusMeterWrap}>
                   <div className={styles.statusMeter}>
+                    <div
+                      className={styles.meterAmber}
+                      style={{
+                        width: `${summary.totalBookings > 0 ? (summary.pendingBookings / summary.totalBookings) * 100 : 0}%`
+                      }}
+                    />
                     <div
                       className={styles.meterGreen}
                       style={{
@@ -385,24 +506,30 @@ export default function AdminDashboard() {
 
                   <div className={styles.legendRow}>
                     <div className={styles.legendEntry}>
+                      <span className={styles.dot} style={{ background: '#f59e0b' }} />
+                      <span>Pending: <strong>{summary.pendingBookings}</strong></span>
+                    </div>
+                    <div className={styles.legendEntry}>
                       <span className={styles.dot} style={{ background: '#22c55e' }} />
-                      <span>Confirmed: <strong>{summary.confirmedBookings}</strong> ({summary.totalBookings > 0 ? Math.round((summary.confirmedBookings / summary.totalBookings) * 100) : 100}%)</span>
+                      <span>Confirmed: <strong>{summary.confirmedBookings}</strong></span>
                     </div>
                     <div className={styles.legendEntry}>
                       <span className={styles.dot} style={{ background: '#ef4444' }} />
-                      <span>Cancelled: <strong>{summary.cancelledBookings}</strong> ({summary.totalBookings > 0 ? Math.round((summary.cancelledBookings / summary.totalBookings) * 100) : 0}%)</span>
+                      <span>Cancelled: <strong>{summary.cancelledBookings}</strong></span>
                     </div>
                   </div>
                 </div>
 
                 <hr className={styles.panelDivider} />
 
-                <h4 className={styles.miniTitle}>Tour Categories in Database</h4>
-                <div className={styles.categoryPills}>
-                  <div className={styles.pill}>⛰️ Mountain & Alpine: <strong>2 tours</strong></div>
-                  <div className={styles.pill}>🏛️ Cultural Heritage: <strong>3 tours</strong></div>
-                  <div className={styles.pill}>🏖️ Beach & Coastal: <strong>2 tours</strong></div>
-                  <div className={styles.pill}>🏙️ City Exploration: <strong>1 tour</strong></div>
+                <h4 className={styles.miniTitle}>Direct Organization Controls</h4>
+                <div className={styles.quickActionLinks}>
+                  <button onClick={() => setActiveTab('bookings')} className={styles.quickActionBtn}>
+                    Review Pending Bookings ({summary.pendingBookings}) →
+                  </button>
+                  <button onClick={() => setActiveTab('availability')} className={styles.quickActionBtn}>
+                    Manage Departure Dates & Seats →
+                  </button>
                 </div>
               </div>
 
@@ -420,11 +547,11 @@ export default function AdminDashboard() {
               
               <div className={styles.panelHeader}>
                 <div>
-                  <h2 className={styles.panelHeading}>Tour Packages Catalog (`db.packages`)</h2>
-                  <p className={styles.panelSub}>Create, edit, and manage all published travel itineraries.</p>
+                  <h2 className={styles.panelHeading}>Organization Tour Packages (`db.packages`)</h2>
+                  <p className={styles.panelSub}>Create, edit, toggle visibility, and adjust pricing. Disabled packages immediately disappear from the customer listing.</p>
                 </div>
                 <button onClick={handleOpenAddPkg} className={styles.primaryBtn}>
-                  <Plus size={16} /> Add New Tour Package
+                  <Plus size={16} /> Create Tour Package
                 </button>
               </div>
 
@@ -433,57 +560,73 @@ export default function AdminDashboard() {
                   <thead>
                     <tr>
                       <th>Image</th>
-                      <th>Tour Title</th>
-                      <th>Destination / Country</th>
-                      <th>Category</th>
+                      <th>Tour Package Title</th>
+                      <th>Destination</th>
                       <th>Price / Person</th>
                       <th>Duration</th>
-                      <th>Group Size</th>
-                      <th>Rating</th>
+                      <th>Max Capacity</th>
+                      <th>Customer Visibility</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {packages.map(p => (
-                      <tr key={p.id || p._id}>
-                        <td>
-                          <img src={p.coverImage} alt="" className={styles.tableThumb} />
-                        </td>
-                        <td>
-                          <strong className={styles.pkgTitleText}>{p.title}</strong>
-                        </td>
-                        <td>
-                          {p.destination}, {p.country} {p.flag}
-                        </td>
-                        <td>
-                          <span className={styles.catBadge}>{p.category}</span>
-                        </td>
-                        <td>
-                          <strong className={styles.priceHighlight}>₹{p.price?.toLocaleString('en-IN')}</strong>
-                        </td>
-                        <td>{p.duration}</td>
-                        <td>{p.groupSize}</td>
-                        <td>⭐ {p.rating} ({p.reviewCount})</td>
-                        <td>
-                          <div className={styles.actionBtns}>
+                    {packages.map(p => {
+                      const isActive = p.isActive !== false;
+                      return (
+                        <tr key={p.id || p._id} style={{ opacity: isActive ? 1 : 0.65 }}>
+                          <td>
+                            <img src={p.coverImage} alt="" className={styles.tableThumb} />
+                          </td>
+                          <td>
+                            <strong className={styles.pkgTitleText}>{p.title}</strong>
+                            <span className={styles.subText}>{p.category}</span>
+                          </td>
+                          <td>
+                            {p.destination}, {p.country} {p.flag}
+                          </td>
+                          <td>
+                            <strong className={styles.priceHighlight}>₹{p.price?.toLocaleString('en-IN')}</strong>
+                          </td>
+                          <td>{p.duration}</td>
+                          <td>{p.capacity || 12} Seats</td>
+                          <td>
                             <button
-                              onClick={() => handleOpenEditPkg(p)}
-                              className={styles.editBtn}
-                              title="Edit Package"
+                              onClick={() => handleToggleActive(p)}
+                              className={`${styles.toggleActiveBtn} ${isActive ? styles.btnActiveOn : styles.btnActiveOff}`}
+                              title={isActive ? 'Click to Disable from Customer Website' : 'Click to Enable on Customer Website'}
                             >
-                              <Edit size={15} />
+                              {isActive ? (
+                                <>
+                                  <Check size={14} /> Active (Visible)
+                                </>
+                              ) : (
+                                <>
+                                  <Ban size={14} /> Disabled (Hidden)
+                                </>
+                              )}
                             </button>
-                            <button
-                              onClick={() => handleDeletePkg(p.id || p._id)}
-                              className={styles.deleteBtn}
-                              title="Delete Package"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td>
+                            <div className={styles.actionBtns}>
+                              <button
+                                onClick={() => handleOpenEditPkg(p)}
+                                className={styles.editBtn}
+                                title="Edit Package Details"
+                              >
+                                <Edit size={15} />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePkg(p.id || p._id)}
+                                className={styles.deleteBtn}
+                                title="Delete Package"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -493,7 +636,154 @@ export default function AdminDashboard() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 3: MANAGE BOOKINGS */}
+        {/* TAB 3: MANAGE AVAILABILITY & CAPACITY */}
+        {/* ========================================================= */}
+        {activeTab === 'availability' && (
+          <div className={styles.tabContent}>
+            <div className={styles.tablePanel}>
+              
+              <div className={styles.panelHeader}>
+                <div>
+                  <h2 className={styles.panelHeading}>Availability & Departure Capacity Control</h2>
+                  <p className={styles.panelSub}>Directly control available departure dates, set capacity limits, monitor booked seats, and close dates manually.</p>
+                </div>
+              </div>
+
+              {/* Package Selector */}
+              <div className={styles.availSelectorBox}>
+                <label>Select Tour Package:</label>
+                <select
+                  value={selectedPkgForAvail?.id || selectedPkgForAvail?._id || ''}
+                  onChange={(e) => {
+                    const sel = packages.find(p => (p.id === e.target.value || p._id === e.target.value));
+                    if (sel) setSelectedPkgForAvail(sel);
+                  }}
+                  className={styles.availPkgSelect}
+                >
+                  {packages.map(p => (
+                    <option key={p.id || p._id} value={p.id || p._id}>
+                      {p.title} ({p.destination}) - ₹{p.price?.toLocaleString('en-IN')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedPkgForAvail && (
+                <div>
+                  
+                  {/* Add New Date Form */}
+                  <form onSubmit={handleAddAvailDate} className={styles.addDateForm}>
+                    <div className={styles.addDateInputs}>
+                      <div className={styles.field}>
+                        <label className={styles.inputLabel}>Add New Departure Date</label>
+                        <input
+                          type="date"
+                          required
+                          value={newAvailDate}
+                          onChange={(e) => setNewAvailDate(e.target.value)}
+                          className={styles.dateInput}
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <label className={styles.inputLabel}>Max Seat Capacity</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={newAvailCapacity}
+                          onChange={(e) => setNewAvailCapacity(e.target.value)}
+                          className={styles.capacityInput}
+                        />
+                      </div>
+
+                      <button type="submit" className={styles.primaryBtn} style={{ alignSelf: 'flex-end' }}>
+                        <Plus size={15} /> Add Departure Date
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Schedule Table */}
+                  <div className={styles.tableWrap} style={{ marginTop: '1.5rem' }}>
+                    <table className={styles.adminTable}>
+                      <thead>
+                        <tr>
+                          <th>Departure Date</th>
+                          <th>Total Capacity</th>
+                          <th>Booked Seats</th>
+                          <th>Remaining Spots</th>
+                          <th>Date Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(selectedPkgForAvail.schedule && selectedPkgForAvail.schedule.length > 0
+                          ? selectedPkgForAvail.schedule
+                          : (selectedPkgForAvail.availableDates || []).map(d => ({
+                              date: d,
+                              capacity: selectedPkgForAvail.capacity || 12,
+                              bookedSpots: 0,
+                              isClosed: false
+                            }))
+                        ).map((s, idx) => {
+                          const remaining = Math.max(0, (s.capacity || 12) - (s.bookedSpots || 0));
+                          const isFull = remaining === 0;
+                          return (
+                            <tr key={idx}>
+                              <td>
+                                <strong>
+                                  {new Date(s.date).toLocaleDateString('en-IN', {
+                                    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+                                  })}
+                                </strong>
+                                <span className={styles.subText}><code>{s.date}</code></span>
+                              </td>
+                              <td>{s.capacity || 12} Travelers</td>
+                              <td><strong>{s.bookedSpots || 0} Booked</strong></td>
+                              <td>
+                                <strong style={{ color: isFull ? '#ef4444' : '#4ade80' }}>
+                                  {remaining} Spots Left
+                                </strong>
+                              </td>
+                              <td>
+                                <span className={`${styles.statusBadge} ${s.isClosed || isFull ? styles.statusCancelled : styles.statusConfirmed}`}>
+                                  {s.isClosed ? 'Closed Manually' : isFull ? 'Capacity Full' : 'Open for Bookings'}
+                                </span>
+                              </td>
+                              <td>
+                                <div className={styles.actionBtns}>
+                                  <button
+                                    onClick={() => handleToggleCloseDate(s.date)}
+                                    className={styles.btnActionSecondary}
+                                    title={s.isClosed ? 'Open Date for Bookings' : 'Close Date'}
+                                  >
+                                    {s.isClosed ? 'Open Date' : 'Close Date'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleRemoveDate(s.date)}
+                                    className={styles.deleteBtn}
+                                    title="Delete Date"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 4: MANAGE BOOKINGS */}
         {/* ========================================================= */}
         {activeTab === 'bookings' && (
           <div className={styles.tabContent}>
@@ -501,8 +791,8 @@ export default function AdminDashboard() {
               
               <div className={styles.panelHeader}>
                 <div>
-                  <h2 className={styles.panelHeading}>Customer Bookings (`db.bookings`)</h2>
-                  <p className={styles.panelSub}>View customer reservations, verify departure dates, and update statuses.</p>
+                  <h2 className={styles.panelHeading}>Customer Bookings Pipeline (`db.bookings`)</h2>
+                  <p className={styles.panelSub}>Review all customer bookings. Default new bookings are <strong>Pending</strong> until confirmed or rejected by the organization.</p>
                 </div>
 
                 {/* Filter & Search Bar */}
@@ -523,10 +813,12 @@ export default function AdminDashboard() {
                     onChange={(e) => setBookingFilter(e.target.value)}
                     className={styles.filterSelect}
                   >
-                    <option value="all">All Statuses</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="completed">Completed</option>
+                    <option value="all">All Statuses ({bookings.length})</option>
+                    <option value="pending">Pending ({summary.pendingBookings})</option>
+                    <option value="confirmed">Confirmed ({summary.confirmedBookings})</option>
+                    <option value="rejected">Rejected ({summary.rejectedBookings})</option>
+                    <option value="cancelled">Cancelled ({summary.cancelledBookings})</option>
+                    <option value="completed">Completed ({summary.completedBookings})</option>
                   </select>
                 </div>
               </div>
@@ -539,26 +831,29 @@ export default function AdminDashboard() {
                     <thead>
                       <tr>
                         <th>Booking Ref</th>
-                        <th>Lead Traveler</th>
-                        <th>Contact Email & Phone</th>
+                        <th>Customer / Contact</th>
                         <th>Tour Package</th>
-                        <th>Departure Date</th>
+                        <th>Travel Date</th>
                         <th>Travelers</th>
-                        <th>Total Paid</th>
+                        <th>Total Price</th>
                         <th>Status</th>
-                        <th>Update Status</th>
+                        <th>Update Organization Status</th>
+                        <th>Details</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredBookings.map(b => (
                         <tr key={b._id || b.bookingRef}>
                           <td><code className={styles.refCode}>{b.bookingRef}</code></td>
-                          <td><strong>{b.leadTraveler?.fullName}</strong></td>
                           <td>
-                            <div>{b.leadTraveler?.email}</div>
-                            <span className={styles.subText}>{b.leadTraveler?.phone}</span>
+                            <strong>{b.leadTraveler?.fullName}</strong>
+                            <div className={styles.subText}>{b.leadTraveler?.email}</div>
+                            <div className={styles.subText}>{b.leadTraveler?.phone}</div>
                           </td>
-                          <td>{b.packageTitle}</td>
+                          <td>
+                            <strong>{b.packageTitle}</strong>
+                            <div className={styles.subText}>{b.destination}, {b.country}</div>
+                          </td>
                           <td>
                             {new Date(b.departureDate).toLocaleDateString('en-IN', {
                               day: 'numeric', month: 'short', year: 'numeric'
@@ -569,6 +864,8 @@ export default function AdminDashboard() {
                           <td>
                             <span className={`${styles.statusBadge} ${
                               b.status === 'confirmed' ? styles.statusConfirmed :
+                              b.status === 'pending' ? styles.statusPending :
+                              b.status === 'rejected' ? styles.statusRejected :
                               b.status === 'cancelled' ? styles.statusCancelled : styles.statusCompleted
                             }`}>
                               {b.status}
@@ -580,9 +877,18 @@ export default function AdminDashboard() {
                                 <button
                                   onClick={() => handleUpdateStatus(b._id || b.bookingRef, 'confirmed')}
                                   className={styles.btnConfirm}
-                                  title="Mark Confirmed"
+                                  title="Confirm Booking"
                                 >
                                   Confirm
+                                </button>
+                              )}
+                              {b.status !== 'rejected' && (
+                                <button
+                                  onClick={() => handleUpdateStatus(b._id || b.bookingRef, 'rejected')}
+                                  className={styles.btnReject}
+                                  title="Reject Booking"
+                                >
+                                  Reject
                                 </button>
                               )}
                               {b.status !== 'cancelled' && (
@@ -605,6 +911,15 @@ export default function AdminDashboard() {
                               )}
                             </div>
                           </td>
+                          <td>
+                            <button
+                              onClick={() => setSelectedBooking(b)}
+                              className={styles.btnViewDetails}
+                              title="View Full Booking Info"
+                            >
+                              <Eye size={15} />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -617,7 +932,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 4: MANAGE CUSTOMERS */}
+        {/* TAB 5: MANAGE CUSTOMERS */}
         {/* ========================================================= */}
         {activeTab === 'customers' && (
           <div className={styles.tabContent}>
@@ -626,7 +941,7 @@ export default function AdminDashboard() {
               <div className={styles.panelHeader}>
                 <div>
                   <h2 className={styles.panelHeading}>Registered Customers (`db.users` role='customer')</h2>
-                  <p className={styles.panelSub}>Customer directory, registered contact information, and total spending.</p>
+                  <p className={styles.panelSub}>Customer directory, registered contact information, and lifetime booking history.</p>
                 </div>
               </div>
 
@@ -657,7 +972,7 @@ export default function AdminDashboard() {
                         <td>{c.email}</td>
                         <td>{c.phone || 'N/A'}</td>
                         <td>{c.country || 'India'}</td>
-                        <td><strong>{c.totalBookings || 0}</strong></td>
+                        <td><strong>{c.totalBookings || 0} Bookings</strong></td>
                         <td><strong className={styles.priceHighlight}>₹{(c.totalSpent || 0).toLocaleString('en-IN')}</strong></td>
                         <td>
                           {new Date(c.createdAt || Date.now()).toLocaleDateString('en-IN', {
@@ -677,6 +992,95 @@ export default function AdminDashboard() {
       </div>
 
       {/* ========================================================= */}
+      {/* MODAL: VIEW FULL BOOKING DETAILS */}
+      {/* ========================================================= */}
+      {selectedBooking && (
+        <div className={styles.modalBackdrop}>
+          <div className={styles.modalCard}>
+            
+            <div className={styles.modalHeader}>
+              <div>
+                <h3>Booking Record: {selectedBooking.bookingRef}</h3>
+                <span className={`${styles.statusBadge} ${
+                  selectedBooking.status === 'confirmed' ? styles.statusConfirmed :
+                  selectedBooking.status === 'pending' ? styles.statusPending :
+                  selectedBooking.status === 'rejected' ? styles.statusRejected :
+                  selectedBooking.status === 'cancelled' ? styles.statusCancelled : styles.statusCompleted
+                }`}>
+                  Status: {selectedBooking.status.toUpperCase()}
+                </span>
+              </div>
+              <button onClick={() => setSelectedBooking(null)} className={styles.modalCloseBtn}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className={styles.bookingDetailBody}>
+              <div className={styles.detailSection}>
+                <h4>Tour Package Details</h4>
+                <p><strong>Package:</strong> {selectedBooking.packageTitle}</p>
+                <p><strong>Destination:</strong> {selectedBooking.destination}, {selectedBooking.country}</p>
+                <p><strong>Departure Date:</strong> {new Date(selectedBooking.departureDate).toLocaleDateString('en-IN', {
+                  weekday: 'short', day: 'numeric', month: 'long', year: 'numeric'
+                })}</p>
+              </div>
+
+              <div className={styles.detailSection}>
+                <h4>Lead Customer Details</h4>
+                <p><strong>Full Name:</strong> {selectedBooking.leadTraveler?.fullName}</p>
+                <p><strong>Email Address:</strong> {selectedBooking.leadTraveler?.email}</p>
+                <p><strong>Phone Number:</strong> {selectedBooking.leadTraveler?.phone}</p>
+              </div>
+
+              {selectedBooking.additionalTravelers && selectedBooking.additionalTravelers.length > 0 && (
+                <div className={styles.detailSection}>
+                  <h4>Additional Travelers ({selectedBooking.additionalTravelers.length})</h4>
+                  <ul>
+                    {selectedBooking.additionalTravelers.map((t, i) => (
+                      <li key={i}>{t.fullName}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {selectedBooking.specialRequests && (
+                <div className={styles.detailSection}>
+                  <h4>Customer Special Requests</h4>
+                  <p className={styles.reqText}>{selectedBooking.specialRequests}</p>
+                </div>
+              )}
+
+              <div className={styles.detailSection}>
+                <h4>Financial Breakdown</h4>
+                <p>Price per Person: ₹{selectedBooking.pricePerPerson?.toLocaleString('en-IN')}</p>
+                <p>Travelers: {selectedBooking.travelersCount}</p>
+                <p>Subtotal: ₹{selectedBooking.subtotal?.toLocaleString('en-IN')}</p>
+                <p>Taxes (5%): ₹{selectedBooking.taxes?.toLocaleString('en-IN')}</p>
+                <p><strong className={styles.priceHighlight}>Total Price: ₹{selectedBooking.totalPrice?.toLocaleString('en-IN')}</strong></p>
+              </div>
+
+              <div className={styles.modalStatusButtons}>
+                <span>Change Status:</span>
+                <button onClick={() => handleUpdateStatus(selectedBooking._id || selectedBooking.bookingRef, 'confirmed')} className={styles.btnConfirm}>
+                  Confirm
+                </button>
+                <button onClick={() => handleUpdateStatus(selectedBooking._id || selectedBooking.bookingRef, 'rejected')} className={styles.btnReject}>
+                  Reject
+                </button>
+                <button onClick={() => handleUpdateStatus(selectedBooking._id || selectedBooking.bookingRef, 'cancelled')} className={styles.btnCancel}>
+                  Cancel
+                </button>
+                <button onClick={() => handleUpdateStatus(selectedBooking._id || selectedBooking.bookingRef, 'completed')} className={styles.btnComplete}>
+                  Mark Completed
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
       {/* MODAL: ADD / EDIT PACKAGE */}
       {/* ========================================================= */}
       {showPkgModal && (
@@ -684,7 +1088,7 @@ export default function AdminDashboard() {
           <div className={styles.modalCard}>
             
             <div className={styles.modalHeader}>
-              <h3>{editingPkg ? 'Edit Tour Package' : 'Create New Tour Package'}</h3>
+              <h3>{editingPkg ? 'Edit Tour Package' : 'Create Organization Tour Package'}</h3>
               <button onClick={() => setShowPkgModal(false)} className={styles.modalCloseBtn}>
                 <X size={18} />
               </button>
@@ -770,18 +1174,19 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className={styles.modalField}>
-                  <label>Group Size</label>
+                  <label>Max Seat Capacity Per Departure</label>
                   <input
-                    type="text"
-                    placeholder="e.g. Max 12 travelers"
-                    value={pkgFormData.groupSize}
-                    onChange={(e) => setPkgFormData(f => ({ ...f, groupSize: e.target.value }))}
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={pkgFormData.capacity}
+                    onChange={(e) => setPkgFormData(f => ({ ...f, capacity: Number(e.target.value) }))}
                   />
                 </div>
               </div>
 
               <div className={styles.modalField}>
-                <label>Cover Image URL (Unsplash / Direct Link) *</label>
+                <label>Cover Image URL *</label>
                 <input
                   type="url"
                   required

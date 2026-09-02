@@ -77,10 +77,10 @@ export default function Home() {
       {/* Hero Header */}
       <section className={styles.heroSection}>
         <div className={styles.heroContainer}>
-          <div className={styles.heroBadge}>Curated Global Expeditions</div>
+          <div className={styles.heroBadge}>Official Travel & Tour Booking Platform</div>
           <h1 className={styles.heroTitle}>Discover Exceptional Travel Packages</h1>
           <p className={styles.heroSubtitle}>
-            Handcrafted itineraries, verified boutique accommodations, and certified local guides worldwide.
+            Handcrafted itineraries, verified accommodations, and certified expedition leaders organized directly by WanderVista.
           </p>
 
           {/* Search Bar */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
-import { CheckCircle, Calendar, Users, MapPin, Download, Printer, ArrowRight, Compass, ShieldCheck } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Users, MapPin, Printer, ArrowRight, Compass, ShieldCheck } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { bookingsAPI } from '../services/api';
@@ -53,6 +53,8 @@ export default function BookingConfirmation() {
     );
   }
 
+  const isPending = booking.status === 'pending';
+
   return (
     <div className={styles.page}>
       <Navbar />
@@ -60,14 +62,28 @@ export default function BookingConfirmation() {
       <main className={styles.main}>
         <div className={styles.container}>
           
-          {/* Success Banner */}
+          {/* Status Banner */}
           <div className={styles.successBanner}>
-            <div className={styles.successIconWrapper}>
-              <CheckCircle size={44} className={styles.successIcon} />
+            <div className={styles.successIconWrapper} style={{ background: isPending ? '#fef3c7' : '#dcfce7' }}>
+              {isPending ? (
+                <Clock size={44} style={{ color: '#d97706' }} />
+              ) : (
+                <CheckCircle size={44} className={styles.successIcon} />
+              )}
             </div>
-            <h1 className={styles.successTitle}>Booking Confirmed!</h1>
+            <h1 className={styles.successTitle}>
+              {isPending ? 'Booking Submitted Successfully!' : 'Booking Confirmed!'}
+            </h1>
             <p className={styles.successDesc}>
-              Thank you, <strong>{booking.leadTraveler?.fullName}</strong>. Your tour package reservation has been confirmed and registered.
+              {isPending ? (
+                <>
+                  Thank you, <strong>{booking.leadTraveler?.fullName}</strong>. Your reservation request has been received by the WanderVista operations desk and is currently <strong>Pending Confirmation</strong>.
+                </>
+              ) : (
+                <>
+                  Thank you, <strong>{booking.leadTraveler?.fullName}</strong>. Your tour package reservation has been confirmed and registered.
+                </>
+              )}
             </p>
             <div className={styles.refTag}>
               <span>Booking Reference:</span>
@@ -86,9 +102,18 @@ export default function BookingConfirmation() {
                   <span>{booking.destination}, {booking.country}</span>
                 </div>
               </div>
-              <div className={styles.statusPill}>
-                <span className={styles.statusDot} />
-                Confirmed
+              <div
+                className={styles.statusPill}
+                style={{
+                  background: isPending ? '#fef3c7' : '#dcfce7',
+                  color: isPending ? '#b45309' : '#15803d'
+                }}
+              >
+                <span
+                  className={styles.statusDot}
+                  style={{ background: isPending ? '#f59e0b' : '#16a34a' }}
+                />
+                {isPending ? 'Pending Confirmation' : 'Confirmed'}
               </div>
             </div>
 
@@ -141,37 +166,45 @@ export default function BookingConfirmation() {
               </div>
             )}
 
-            {/* Financial Summary */}
-            <div className={styles.paymentSummary}>
-              <div className={styles.payRow}>
-                <span>Package Base Rate ({booking.travelersCount} × ₹{booking.pricePerPerson?.toLocaleString('en-IN')})</span>
+            <hr className={styles.receiptDivider} />
+
+            {/* Price Breakdown */}
+            <div className={styles.priceSummary}>
+              <div className={styles.priceRow}>
+                <span>Base Price ({booking.travelersCount} × ₹{booking.pricePerPerson?.toLocaleString('en-IN')})</span>
                 <span>₹{booking.subtotal?.toLocaleString('en-IN')}</span>
               </div>
-              <div className={styles.payRow}>
-                <span>Taxes & GST (5%)</span>
+              <div className={styles.priceRow}>
+                <span>Taxes & Environmental Surcharges (5%)</span>
                 <span>₹{booking.taxes?.toLocaleString('en-IN')}</span>
               </div>
-              <div className={`${styles.payRow} ${styles.payTotalRow}`}>
-                <span>Total Amount Paid</span>
-                <span className={styles.grandPrice}>₹{booking.totalPrice?.toLocaleString('en-IN')}</span>
+              <div className={`${styles.priceRow} ${styles.totalRow}`}>
+                <span>Total Amount</span>
+                <span>₹{booking.totalPrice?.toLocaleString('en-IN')}</span>
               </div>
             </div>
 
-            {/* Actions Bar */}
-            <div className={styles.actionsBar}>
+            {/* Actions */}
+            <div className={styles.cardActions}>
               <button onClick={handlePrint} className={styles.printBtn}>
                 <Printer size={16} /> Print / Save Voucher
               </button>
-              <div className={styles.navLinksGroup}>
-                <Link to="/my-bookings" className={styles.primaryBtn}>
-                  View in My Bookings
-                </Link>
-                <Link to="/" className={styles.secondaryBtn}>
-                  Explore More Packages <ArrowRight size={15} />
-                </Link>
-              </div>
+              <Link to="/my-bookings" className={styles.bookingsLink}>
+                View All My Bookings <ArrowRight size={16} />
+              </Link>
             </div>
 
+          </div>
+
+          {/* Direct Organization Support */}
+          <div className={styles.supportBox}>
+            <ShieldCheck size={20} className={styles.supportIcon} />
+            <div>
+              <strong>Official Direct Booking Guarantee</strong>
+              <p>
+                Your expedition is organized and operated directly by WanderVista Travel Co. For assistance with your departure date, contact our operations desk at <strong>support@wandervista.com</strong> or <strong>+91 1800 200 4545</strong>.
+              </p>
+            </div>
           </div>
 
         </div>

@@ -28,6 +28,31 @@ const handleResponse = async (res) => {
   return data;
 };
 
+// Local storage helpers for state sync
+const getLocalPackages = () => {
+  try {
+    const saved = localStorage.getItem('wv_local_packages');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  return [...PACKAGES];
+};
+
+const saveLocalPackages = (pkgs) => {
+  localStorage.setItem('wv_local_packages', JSON.stringify(pkgs));
+};
+
+const getLocalBookings = () => {
+  try {
+    return JSON.parse(localStorage.getItem('wv_local_bookings') || '[]');
+  } catch (e) {
+    return [];
+  }
+};
+
+const saveLocalBookings = (bookings) => {
+  localStorage.setItem('wv_local_bookings', JSON.stringify(bookings));
+};
+
 // ==========================================
 // 1. CUSTOMER AUTHENTICATION API (/api/auth/*)
 // ==========================================
@@ -103,12 +128,12 @@ export const adminAPI = {
         const data = await res.json();
         if (data.summary) return data;
       }
-    } catch (e) {
-      // fallback calculation
-    }
+    } catch (e) {}
 
     const bookings = getLocalBookings();
+    const pkgs = getLocalPackages();
     const confirmed = bookings.filter(b => b.status === 'confirmed');
+    const pending = bookings.filter(b => b.status === 'pending');
     const cancelled = bookings.filter(b => b.status === 'cancelled');
     const totalRevenue = confirmed.reduce((s, b) => s + (b.totalPrice || 0), 0);
 
@@ -125,14 +150,17 @@ export const adminAPI = {
       summary: {
         totalRevenue,
         totalBookings: bookings.length,
+        pendingBookings: pending.length,
         confirmedBookings: confirmed.length,
         cancelledBookings: cancelled.length,
-        totalPackages: PACKAGES.length,
+        totalPackages: pkgs.length,
+        activePackages: pkgs.filter(p => p.isActive !== false).length,
         totalCustomers: 1
       },
       charts: {
         revenueByPackage: Object.values(pkgMap),
         statusDistribution: [
+          { status: 'Pending', count: pending.length, color: '#f59e0b' },
           { status: 'Confirmed', count: confirmed.length, color: '#16a34a' },
           { status: 'Cancelled', count: cancelled.length, color: '#dc2626' }
         ],
@@ -152,10 +180,13 @@ export const adminAPI = {
       const res = await fetch(`${BASE_URL}/admin/packages`, { headers: getAdminHeaders() });
       if (res.ok) {
         const data = await res.json();
-        if (data.packages) return data;
+        if (data.packages) {
+          saveLocalPackages(data.packages);
+          return data;
+        }
       }
     } catch (e) {}
-    return { success: true, packages: PACKAGES };
+    return { success: true, packages: getLocalPackages() };
   },
 
   createPackage: async (body) => {
@@ -165,11 +196,24 @@ export const adminAPI = {
         headers: getAdminHeaders(),
         body: JSON.stringify(body)
       });
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        const data = await res.json();
+        const local = getLocalPackages();
+        saveLocalPackages([data.package, ...local]);
+        return data;
+      }
     } catch (e) {}
 
-    const newPkg = { id: 'pkg-' + Date.now(), ...body, rating: 5.0, reviewCount: 1 };
-    PACKAGES.unshift(newPkg);
+    const newPkg = {
+      id: 'pkg-' + Date.now(),
+      _id: 'pkg-' + Date.now(),
+      isActive: true,
+      rating: 5.0,
+      reviewCount: 1,
+      ...body
+    };
+    const local = getLocalPackages();
+    saveLocalPackages([newPkg, ...local]);
     return { success: true, package: newPkg };
   },
 
@@ -180,15 +224,56 @@ export const adminAPI = {
         headers: getAdminHeaders(),
         body: JSON.stringify(body)
       });
+      if (res.ok) {
+        const data = await res.json();
+        const local = getLocalPackages().map(p => (p.id === id || p._id === id) ? { ...p, ...body } : p);
+        saveLocalPackages(local);
+        return data;
+      }
+    } catch (e) {}
+
+    const local = getLocalPackages().map(p => (p.id === id || p._id === id) ? { ...p, ...body } : p);
+    saveLocalPackages(local);
+    return { success: true };
+  },
+
+  togglePackageActive: async (id) => {
+    try {
+      const res = await fetch(`${BASE_URL}/admin/packages/${id}/toggle-active`, {
+        method: 'PATCH',
+        headers: getAdminHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const local = getLocalPackages().map(p => (p.id === id || p._id === id) ? { ...p, isActive: data.isActive } : p);
+        saveLocalPackages(local);
+        return data;
+      }
+    } catch (e) {}
+
+    let newStatus = true;
+    const local = getLocalPackages().map(p => {
+      if (p.id === id || p._id === id) {
+        newStatus = p.isActive === false ? true : false;
+        return { ...p, isActive: newStatus };
+      }
+      return p;
+    });
+    saveLocalPackages(local);
+    return { success: true, isActive: newStatus };
+  },
+
+  updateAvailability: async (id, body) => {
+    try {
+      const res = await fetch(`${BASE_URL}/admin/packages/${id}/availability`, {
+        method: 'PUT',
+        headers: getAdminHeaders(),
+        body: JSON.stringify(body)
+      });
       if (res.ok) return await res.json();
     } catch (e) {}
 
-    const idx = PACKAGES.findIndex(p => p.id === id || p._id === id);
-    if (idx !== -1) {
-      PACKAGES[idx] = { ...PACKAGES[idx], ...body };
-      return { success: true, package: PACKAGES[idx] };
-    }
-    return { success: true };
+    return { success: true, message: 'Availability schedule updated.' };
   },
 
   deletePackage: async (id) => {
@@ -197,11 +282,15 @@ export const adminAPI = {
         method: 'DELETE',
         headers: getAdminHeaders()
       });
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        const local = getLocalPackages().filter(p => p.id !== id && p._id !== id);
+        saveLocalPackages(local);
+        return await res.json();
+      }
     } catch (e) {}
 
-    const idx = PACKAGES.findIndex(p => p.id === id || p._id === id);
-    if (idx !== -1) PACKAGES.splice(idx, 1);
+    const local = getLocalPackages().filter(p => p.id !== id && p._id !== id);
+    saveLocalPackages(local);
     return { success: true, message: 'Package deleted.' };
   },
 
@@ -219,19 +308,24 @@ export const adminAPI = {
     return { success: true, bookings: getLocalBookings() };
   },
 
-  updateBookingStatus: async (id, status) => {
+  updateBookingStatus: async (id, status, adminNotes) => {
     try {
       const res = await fetch(`${BASE_URL}/admin/bookings/${id}/status`, {
         method: 'PUT',
         headers: getAdminHeaders(),
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, adminNotes })
       });
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        const data = await res.json();
+        const local = getLocalBookings().map(b => (b._id === id || b.bookingRef === id) ? { ...b, status, adminNotes } : b);
+        saveLocalBookings(local);
+        return data;
+      }
     } catch (e) {}
 
-    const local = getLocalBookings().map(b => (b._id === id || b.bookingRef === id) ? { ...b, status } : b);
+    const local = getLocalBookings().map(b => (b._id === id || b.bookingRef === id) ? { ...b, status, adminNotes } : b);
     saveLocalBookings(local);
-    return { success: true, message: `Booking status updated to ${status}` };
+    return { success: true, message: `Booking status updated to ${status}.` };
   },
 
   getCustomers: async () => {
@@ -271,8 +365,10 @@ export const packagesAPI = {
       }
     } catch (e) {}
 
-    let result = [...PACKAGES];
-    if (params.category && params.category !== 'all') {
+    // Filter only active packages on customer side
+    let result = getLocalPackages().filter(p => p.isActive !== false);
+
+    if (params.category && params.category !== 'all' && params.category !== 'All Styles') {
       result = result.filter(p => p.category.toLowerCase().includes(params.category.toLowerCase()));
     }
     if (params.search) {
@@ -306,27 +402,16 @@ export const packagesAPI = {
         if (data.package) return data;
       }
     } catch (e) {}
-    const pkg = getPackageById(id);
+
+    const pkg = getLocalPackages().find(p => (p.id === id || p._id === id) && p.isActive !== false);
     if (pkg) return { success: true, package: pkg };
-    throw new Error('Package not found');
+    throw new Error('Tour package not found or currently unavailable.');
   }
 };
 
 // ==========================================
 // 4. BOOKINGS API (Customer Facing)
 // ==========================================
-const getLocalBookings = () => {
-  try {
-    return JSON.parse(localStorage.getItem('wv_local_bookings') || '[]');
-  } catch (e) {
-    return [];
-  }
-};
-
-const saveLocalBookings = (bookings) => {
-  localStorage.setItem('wv_local_bookings', JSON.stringify(bookings));
-};
-
 export const bookingsAPI = {
   getMyBookings: async () => {
     try {
@@ -372,10 +457,11 @@ export const bookingsAPI = {
       }
     } catch (e) {}
 
+    // Default status is 'pending'
     const localBooking = {
       _id: 'local_' + Date.now(),
       bookingRef: 'WV-' + Math.floor(100000 + Math.random() * 900000),
-      status: 'confirmed',
+      status: 'pending',
       createdAt: new Date().toISOString(),
       ...bookingData
     };

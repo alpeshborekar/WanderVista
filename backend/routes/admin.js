@@ -8,14 +8,16 @@ const {
   getAllPackages,
   createPackage,
   updatePackage,
+  togglePackageActive,
   deletePackage,
   getAllBookings,
   updateBookingStatus,
+  updateAvailability,
   getAllCustomers
 } = require('../controllers/adminController');
 const { protectAdmin } = require('../middleware/auth');
 
-// 1. Admin Auth Routes
+// 1. Admin Auth
 router.post('/auth/login', [
   body('email').isEmail().withMessage('Valid email required'),
   body('password').notEmpty().withMessage('Password is required'),
@@ -30,6 +32,8 @@ router.get('/stats', protectAdmin, getDashboardStats);
 router.get('/packages', protectAdmin, getAllPackages);
 router.post('/packages', protectAdmin, createPackage);
 router.put('/packages/:id', protectAdmin, updatePackage);
+router.patch('/packages/:id/toggle-active', protectAdmin, togglePackageActive);
+router.put('/packages/:id/availability', protectAdmin, updateAvailability);
 router.delete('/packages/:id', protectAdmin, deletePackage);
 
 // 4. Admin Booking Management

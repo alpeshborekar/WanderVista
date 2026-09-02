@@ -13,7 +13,7 @@ const generateAdminToken = (id) => {
   );
 };
 
-// 1. Admin Login
+// 1. Admin Login (Private Organization Account)
 exports.adminLogin = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -31,7 +31,7 @@ exports.adminLogin = async (req, res) => {
     if (user.role !== 'admin') {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: This portal is reserved for administrators only.'
+        message: 'Access denied: This portal is reserved exclusively for the organization owner/administrator.'
       });
     }
 
@@ -59,7 +59,7 @@ exports.adminLogin = async (req, res) => {
   }
 };
 
-// 2. Get Authenticated Admin Info
+// 2. Get Authenticated Admin Profile
 exports.getAdminMe = async (req, res) => {
   res.json({
     success: true,
@@ -74,23 +74,27 @@ exports.getAdminMe = async (req, res) => {
   });
 };
 
-// 3. Admin Dashboard Analytics & Stats
+// 3. Admin Operations & Analytics Stats
 exports.getDashboardStats = async (req, res) => {
   try {
     const totalBookings = await Booking.countDocuments();
+    const pendingBookings = await Booking.countDocuments({ status: 'pending' });
     const confirmedBookings = await Booking.countDocuments({ status: 'confirmed' });
+    const rejectedBookings = await Booking.countDocuments({ status: 'rejected' });
     const cancelledBookings = await Booking.countDocuments({ status: 'cancelled' });
+    const completedBookings = await Booking.countDocuments({ status: 'completed' });
     const totalPackages = await Package.countDocuments();
+    const activePackages = await Package.countDocuments({ isActive: { $ne: false } });
     const totalCustomers = await User.countDocuments({ role: 'customer' });
 
     const revenueAgg = await Booking.aggregate([
-      { $match: { status: 'confirmed' } },
+      { $match: { status: { $in: ['confirmed', 'completed'] } } },
       { $group: { _id: null, totalRevenue: { $sum: '$totalPrice' } } }
     ]);
     const totalRevenue = revenueAgg[0]?.totalRevenue || 0;
 
     const revenueByPackage = await Booking.aggregate([
-      { $match: { status: 'confirmed' } },
+      { $match: { status: { $in: ['confirmed', 'completed'] } } },
       {
         $group: {
           _id: '$packageTitle',
@@ -115,16 +119,23 @@ exports.getDashboardStats = async (req, res) => {
       summary: {
         totalRevenue,
         totalBookings,
+        pendingBookings,
         confirmedBookings,
+        rejectedBookings,
         cancelledBookings,
+        completedBookings,
         totalPackages,
+        activePackages,
         totalCustomers
       },
       charts: {
         revenueByPackage,
         statusDistribution: [
+          { status: 'Pending', count: pendingBookings, color: '#f59e0b' },
           { status: 'Confirmed', count: confirmedBookings, color: '#16a34a' },
-          { status: 'Cancelled', count: cancelledBookings, color: '#dc2626' }
+          { status: 'Rejected', count: rejectedBookings, color: '#dc2626' },
+          { status: 'Cancelled', count: cancelledBookings, color: '#6b7280' },
+          { status: 'Completed', count: completedBookings, color: '#2563eb' }
         ],
         categoryDistribution: categoryAgg.map(c => ({ category: c._id, count: c.count }))
       },
@@ -136,7 +147,7 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
-// 4. Manage Packages: Get All
+// 4. Manage Packages: Get All (including disabled ones)
 exports.getAllPackages = async (req, res) => {
   try {
     const packages = await Package.find().sort({ createdAt: -1 });
@@ -160,6 +171,7 @@ exports.createPackage = async (req, res) => {
       days,
       nights,
       groupSize,
+      capacity,
       coverImage,
       images,
       shortDescription,
@@ -167,7 +179,8 @@ exports.createPackage = async (req, res) => {
       included,
       excluded,
       availableDates,
-      itinerary
+      schedule,
+      isActive
     } = req.body;
 
     if (!title || !destination || !country || !price || !duration || !coverImage) {
@@ -175,6 +188,14 @@ exports.createPackage = async (req, res) => {
     }
 
     const packageId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
+
+    const datesArray = availableDates && availableDates.length > 0
+      ? availableDates
+      : [new Date(Date.now() + 86400000 * 14).toISOString().split('T')[0]];
+
+    const defaultSchedule = schedule && schedule.length > 0
+      ? schedule
+      : datesArray.map(d => ({ date: d, capacity: Number(capacity) || 12, bookedSpots: 0, isClosed: false }));
 
     const newPackage = await Package.create({
       id: packageId,
@@ -187,18 +208,23 @@ exports.createPackage = async (req, res) => {
       duration,
       days: Number(days) || 7,
       nights: Number(nights) || 6,
-      groupSize: groupSize || 'Max 12 travelers',
+      groupSize: groupSize || `Max ${capacity || 12} travelers`,
+      capacity: Number(capacity) || 12,
       rating: 5.0,
       reviewCount: 1,
       featured: true,
+      isActive: isActive !== undefined ? isActive : true,
       coverImage,
       images: images && images.length > 0 ? images : [coverImage],
       shortDescription: shortDescription || overview?.substring(0, 150) || '',
       overview: overview || shortDescription || '',
       included: included || ['Boutique Accommodations', 'Daily Breakfast', 'Certified Tour Guide'],
       excluded: excluded || ['International Flights', 'Travel Insurance'],
-      availableDates: availableDates || [new Date(Date.now() + 86400000 * 15).toISOString().split('T')[0]],
-      itinerary: itinerary || [{ day: 1, title: 'Arrival & Welcome', description: 'Arrive at destination and meet your tour leader.' }]
+      availableDates: datesArray,
+      schedule: defaultSchedule,
+      itinerary: [
+        { day: 1, title: 'Arrival & Welcome', description: 'Arrive at destination and meet your tour leader.' }
+      ]
     });
 
     res.status(201).json({ success: true, message: 'Package created successfully.', package: newPackage });
@@ -227,20 +253,42 @@ exports.updatePackage = async (req, res) => {
   }
 };
 
-// 7. Manage Packages: Delete Package
+// 7. Manage Packages: Toggle Active State
+exports.togglePackageActive = async (req, res) => {
+  try {
+    const pkg = await Package.findOne({ $or: [{ id: req.params.id }, { _id: req.params.id }] });
+    if (!pkg) {
+      return res.status(404).json({ success: false, message: 'Package not found.' });
+    }
+
+    pkg.isActive = !pkg.isActive;
+    await pkg.save();
+
+    res.json({
+      success: true,
+      message: `Package ${pkg.isActive ? 'enabled for customers' : 'disabled from customer listing'}.`,
+      isActive: pkg.isActive,
+      package: pkg
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to toggle package status.' });
+  }
+};
+
+// 8. Manage Packages: Delete Package
 exports.deletePackage = async (req, res) => {
   try {
     const deleted = await Package.findOneAndDelete({ $or: [{ id: req.params.id }, { _id: req.params.id }] });
     if (!deleted) {
       return res.status(404).json({ success: false, message: 'Package not found.' });
     }
-    res.json({ success: true, message: 'Package removed successfully.' });
+    res.json({ success: true, message: 'Package removed from platform.' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to delete package.' });
   }
 };
 
-// 8. Manage Bookings: Get All Bookings
+// 9. Manage Bookings: Get All Bookings
 exports.getAllBookings = async (req, res) => {
   try {
     const { status, search } = req.query;
@@ -264,12 +312,12 @@ exports.getAllBookings = async (req, res) => {
   }
 };
 
-// 9. Manage Bookings: Update Status
+// 10. Manage Bookings: Update Status (Confirm / Reject / Cancel / Complete)
 exports.updateBookingStatus = async (req, res) => {
   try {
-    const { status } = req.body;
-    if (!['confirmed', 'cancelled', 'completed'].includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid booking status.' });
+    const { status, adminNotes } = req.body;
+    if (!['pending', 'confirmed', 'rejected', 'cancelled', 'completed'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid booking status value.' });
     }
 
     const booking = await Booking.findOne({ $or: [{ _id: req.params.id }, { bookingRef: req.params.id }] });
@@ -278,22 +326,67 @@ exports.updateBookingStatus = async (req, res) => {
     }
 
     booking.status = status;
+    if (adminNotes !== undefined) booking.adminNotes = adminNotes;
     await booking.save();
 
-    res.json({ success: true, message: `Booking status updated to ${status}.`, booking });
+    res.json({
+      success: true,
+      message: `Booking ${booking.bookingRef} status updated to ${status}.`,
+      booking
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to update booking status.' });
   }
 };
 
-// 10. Manage Customers: List All Customers
+// 11. Manage Availability: Add / Update Departure Date for a Package
+exports.updateAvailability = async (req, res) => {
+  try {
+    const { date, capacity, isClosed, action } = req.body; // action: 'add', 'remove', 'toggleClosed'
+    const pkg = await Package.findOne({ $or: [{ id: req.params.id }, { _id: req.params.id }] });
+
+    if (!pkg) {
+      return res.status(404).json({ success: false, message: 'Package not found.' });
+    }
+
+    if (!pkg.schedule) pkg.schedule = [];
+
+    if (action === 'add') {
+      if (!date) return res.status(400).json({ success: false, message: 'Departure date required.' });
+      if (!pkg.availableDates.includes(date)) pkg.availableDates.push(date);
+      const existing = pkg.schedule.find(s => s.date === date);
+      if (!existing) {
+        pkg.schedule.push({
+          date,
+          capacity: Number(capacity) || pkg.capacity || 12,
+          bookedSpots: 0,
+          isClosed: false
+        });
+      }
+    } else if (action === 'remove') {
+      pkg.availableDates = pkg.availableDates.filter(d => d !== date);
+      pkg.schedule = pkg.schedule.filter(s => s.date !== date);
+    } else if (action === 'toggleClosed') {
+      const item = pkg.schedule.find(s => s.date === date);
+      if (item) {
+        item.isClosed = !item.isClosed;
+      }
+    }
+
+    await pkg.save();
+    res.json({ success: true, message: 'Availability schedule updated.', schedule: pkg.schedule, availableDates: pkg.availableDates });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to update availability schedule.' });
+  }
+};
+
+// 12. Manage Customers: List All Customers
 exports.getAllCustomers = async (req, res) => {
   try {
     const customers = await User.find({ role: 'customer' })
       .select('-passwordHash -resetPasswordToken -resetPasswordExpires')
       .sort({ createdAt: -1 });
 
-    // Attach booking count for each customer
     const customerIds = customers.map(c => c._id);
     const bookingCounts = await Booking.aggregate([
       { $match: { user: { $in: customerIds } } },
