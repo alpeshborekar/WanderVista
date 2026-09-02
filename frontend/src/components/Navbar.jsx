@@ -61,9 +61,6 @@ export default function Navbar() {
           <Link to="/my-bookings" className={`${styles.navLink} ${location.pathname === '/my-bookings' ? styles.active : ''}`}>
             My Bookings
           </Link>
-          <Link to="/admin" className={`${styles.navLink} ${location.pathname === '/admin' ? styles.active : ''}`}>
-            DB & Analytics
-          </Link>
         </nav>
 
         {/* Right Actions */}
@@ -93,9 +90,6 @@ export default function Navbar() {
                   <hr className={styles.dropdownDivider} />
                   <Link to="/my-bookings" className={styles.dropdownItem}>
                     <Calendar size={16} /> My Bookings
-                  </Link>
-                  <Link to="/admin" className={styles.dropdownItem}>
-                    <BarChart2 size={16} /> DB & Analytics
                   </Link>
                   <Link to="/profile" className={styles.dropdownItem}>
                     <User size={16} /> Profile Settings
@@ -130,7 +124,6 @@ export default function Navbar() {
         <div className={styles.mobileMenu}>
           <Link to="/" className={styles.mobileLink}>All Packages</Link>
           <Link to="/my-bookings" className={styles.mobileLink}>My Bookings</Link>
-          <Link to="/admin" className={styles.mobileLink}>DB & Analytics</Link>
           <hr className={styles.mobileDivider} />
           {isAuthenticated ? (
             <>

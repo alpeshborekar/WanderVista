@@ -1,6 +1,9 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const Package = require('./models/Package');
+const User = require('./models/User');
+const Booking = require('./models/Booking');
 
 const packages = [
   {
@@ -207,9 +210,91 @@ async function seed() {
   try {
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/wandervista');
     console.log('Connected to MongoDB');
+
+    // 1. Seed Packages
     await Package.deleteMany({});
     await Package.insertMany(packages);
     console.log(`✅ Seeded ${packages.length} realistic travel packages`);
+
+    // 2. Seed Admin User
+    await User.deleteMany({ email: 'admin@wandervista.com' });
+    const salt = await bcrypt.genSalt(12);
+    const adminPasswordHash = await bcrypt.hash('Admin@12345', salt);
+    const adminUser = await User.create({
+      fullName: 'WanderVista Administrator',
+      email: 'admin@wandervista.com',
+      passwordHash: adminPasswordHash,
+      role: 'admin',
+      phone: '+91 99999 88888',
+      country: 'India'
+    });
+    console.log(`✅ Seeded Admin Account: admin@wandervista.com (Password: Admin@12345)`);
+
+    // 3. Seed Sample Customer User
+    await User.deleteMany({ email: 'customer@example.com' });
+    const customerPasswordHash = await bcrypt.hash('Customer@123', salt);
+    const customerUser = await User.create({
+      fullName: 'Aarav Mehta',
+      email: 'customer@example.com',
+      passwordHash: customerPasswordHash,
+      role: 'customer',
+      phone: '+91 98765 43210',
+      country: 'India'
+    });
+    console.log(`✅ Seeded Customer Account: customer@example.com (Password: Customer@123)`);
+
+    // 4. Seed Sample Bookings
+    await Booking.deleteMany({});
+    await Booking.create([
+      {
+        user: customerUser._id,
+        packageId: 'swiss-alps-express',
+        packageTitle: 'Swiss Alps & Glacier Express Tour',
+        destination: 'Interlaken & Zermatt',
+        country: 'Switzerland',
+        coverImage: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?w=1000&q=80',
+        departureDate: '2026-09-12',
+        travelersCount: 2,
+        leadTraveler: {
+          fullName: 'Aarav Mehta',
+          email: 'customer@example.com',
+          phone: '+91 98765 43210'
+        },
+        additionalTravelers: [{ fullName: 'Neha Mehta' }],
+        specialRequests: 'Window seats requested on Glacier Express train.',
+        pricePerPerson: 145000,
+        subtotal: 290000,
+        taxes: 14500,
+        totalPrice: 304500,
+        status: 'confirmed',
+        bookingRef: 'WV-582910'
+      },
+      {
+        user: customerUser._id,
+        packageId: 'japan-cultural-odyssey',
+        packageTitle: 'Japan Cultural Odyssey: Tokyo to Kyoto',
+        destination: 'Tokyo, Hakone & Kyoto',
+        country: 'Japan',
+        coverImage: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1000&q=80',
+        departureDate: '2026-10-06',
+        travelersCount: 1,
+        leadTraveler: {
+          fullName: 'Aarav Mehta',
+          email: 'customer@example.com',
+          phone: '+91 98765 43210'
+        },
+        additionalTravelers: [],
+        specialRequests: 'Vegetarian breakfast requested at Hakone ryokan.',
+        pricePerPerson: 168000,
+        subtotal: 168000,
+        taxes: 8400,
+        totalPrice: 176400,
+        status: 'confirmed',
+        bookingRef: 'WV-948123'
+      }
+    ]);
+    console.log(`✅ Seeded sample customer bookings.`);
+
     process.exit(0);
   } catch (err) {
     console.error('Seed error:', err);

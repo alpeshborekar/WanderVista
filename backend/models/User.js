@@ -8,7 +8,9 @@ const userSchema = new mongoose.Schema({
   country: { type: String, default: '' },
   passwordHash: { type: String, required: true },
   avatar: { type: String, default: '' },
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  role: { type: String, enum: ['customer', 'admin'], default: 'customer' },
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
 }, { timestamps: true });
 
 userSchema.methods.matchPassword = async function(password) {

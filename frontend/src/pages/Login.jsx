@@ -117,6 +117,12 @@ export default function Login() {
             {errors.password && <span className={styles.errorText}>{errors.password}</span>}
           </div>
 
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.25rem' }}>
+            <Link to="/forgot-password" style={{ fontSize: '0.825rem', color: '#2563eb', textDecoration: 'none', fontWeight: '500' }}>
+              Forgot password?
+            </Link>
+          </div>
+
           <button type="submit" className={styles.submitBtn} disabled={isLoading}>
             {isLoading ? 'Signing In...' : 'Sign In'}
           </button>
